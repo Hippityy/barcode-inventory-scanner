@@ -1,6 +1,6 @@
 import type { RawBarcode, ParsedComponent } from '@/types/index';
 import type { BarcodeParser } from '@/parsers/BaseParser';
-import { extractQuantity, looksLikeMpn } from '@/parsers/BaseParser';
+import { extractQuantity, looksLikeMpn, stripEciaPrefixes, mightBeNumericMpn } from '@/parsers/BaseParser';
 
 /** Element14 (Farnell) barcode parser.
  *
@@ -18,33 +18,37 @@ export class Element14Parser implements BarcodeParser {
     if (raw.format !== 'CODE_128' && raw.format !== 'CODE_39' && raw.format !== 'DATA_MATRIX') {
       return false;
     }
-    const trimmed = raw.text.trim();
-    if (trimmed.length === 0) {
+    const stripped = stripEciaPrefixes(raw.text.trim());
+    if (stripped.length === 0) {
       return false;
     }
     // Element14 order code pattern: 6-8 digit numeric
-    if (/^\d{6,8}$/.test(trimmed)) {
+    if (/^\d{6,8}$/.test(stripped)) {
       return true;
     }
     // Short numeric (1-5 digits) → likely quantity
-    if (/^\d{1,5}$/.test(trimmed)) {
+    if (/^\d{1,5}$/.test(stripped)) {
       return true;
     }
     // Alphanumeric MPN
-    if (looksLikeMpn(trimmed)) {
+    if (looksLikeMpn(stripped)) {
+      return true;
+    }
+    // Long numeric could be MPN from distributors like Würth
+    if (mightBeNumericMpn(stripped)) {
       return true;
     }
     return false;
   }
 
   parse(raw: RawBarcode): ParsedComponent | null {
-    const trimmed = raw.text.trim();
-    if (trimmed.length === 0) {
+    const stripped = stripEciaPrefixes(raw.text.trim());
+    if (stripped.length === 0) {
       return null;
     }
 
     // 6-8 digit numeric → Element14 order code
-    if (/^\d{6,8}$/.test(trimmed)) {
+    if (/^\d{6,8}$/.test(stripped)) {
       return {
         mpn: null,
         quantity: null,
@@ -55,8 +59,8 @@ export class Element14Parser implements BarcodeParser {
     }
 
     // Short numeric (1-5 digits) → likely quantity
-    if (/^\d{1,5}$/.test(trimmed)) {
-      const qty = extractQuantity(trimmed);
+    if (/^\d{1,5}$/.test(stripped)) {
+      const qty = extractQuantity(stripped);
       return {
         mpn: null,
         quantity: qty,
@@ -67,13 +71,24 @@ export class Element14Parser implements BarcodeParser {
     }
 
     // Alphanumeric MPN-like
-    if (looksLikeMpn(trimmed)) {
+    if (looksLikeMpn(stripped)) {
       return {
-        mpn: trimmed,
+        mpn: stripped,
         quantity: null,
         distributor: 'element14',
         raw: raw.text,
         confidence: 'medium',
+      };
+    }
+
+    // Long numeric could be MPN from distributors like Würth
+    if (mightBeNumericMpn(stripped)) {
+      return {
+        mpn: stripped,
+        quantity: null,
+        distributor: 'element14',
+        raw: raw.text,
+        confidence: 'low',
       };
     }
 

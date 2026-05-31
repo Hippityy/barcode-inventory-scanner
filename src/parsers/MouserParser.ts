@@ -1,6 +1,6 @@
 import type { RawBarcode, ParsedComponent } from '@/types/index';
 import type { BarcodeParser } from '@/parsers/BaseParser';
-import { extractQuantity, looksLikeMpn } from '@/parsers/BaseParser';
+import { extractQuantity, looksLikeMpn, stripEciaPrefixes, mightBeNumericMpn } from '@/parsers/BaseParser';
 import { isEciaFormat, parseEciaFields } from '@/parsers/EciaParser';
 
 /** Mouser barcode parser.
@@ -34,19 +34,21 @@ export class MouserParser implements BarcodeParser {
 
   private looksLikeMouser1d(text: string): boolean {
     const trimmed = text.trim();
-    if (trimmed.length === 0) {
-      return false;
-    }
-    // Mouser 1D barcodes are alphanumeric (unlike DigiKey all-numeric)
-    if (/^\d+$/.test(trimmed)) {
+    const stripped = stripEciaPrefixes(trimmed);
+    if (stripped.length === 0) {
       return false;
     }
     // Mouser part numbers often start with numeric prefix like 710-XXXXXXX
-    if (/^\d{3}-[A-Z0-9]+$/i.test(trimmed)) {
+    if (/^\d{3}-[A-Z0-9]+$/i.test(stripped)) {
       return true;
     }
     // Generic alphanumeric that looks like an MPN
-    if (looksLikeMpn(trimmed)) {
+    if (looksLikeMpn(stripped)) {
+      return true;
+    }
+    // Accept numeric MPN only if an ECIA prefix was explicitly present
+    const hadPrefix = stripped !== trimmed;
+    if (hadPrefix && mightBeNumericMpn(stripped)) {
       return true;
     }
     return false;
@@ -90,8 +92,11 @@ export class MouserParser implements BarcodeParser {
 
   private parse1d(text: string): ParsedComponent | null {
     const trimmed = text.trim();
+    const stripped = stripEciaPrefixes(trimmed);
+    const hadPrefix = stripped !== trimmed;
+
     // Mouser P/N format: 710-XXXXXXX etc → not an MPN
-    if (/^\d{3}-[A-Z0-9]+$/i.test(trimmed)) {
+    if (/^\d{3}-[A-Z0-9]+$/i.test(stripped)) {
       return {
         mpn: null,
         quantity: null,
@@ -101,13 +106,23 @@ export class MouserParser implements BarcodeParser {
       };
     }
     // Alphanumeric MPN-like string
-    if (looksLikeMpn(trimmed)) {
+    if (looksLikeMpn(stripped)) {
       return {
-        mpn: trimmed,
+        mpn: stripped,
         quantity: null,
         distributor: 'mouser',
         raw: text,
         confidence: 'medium',
+      };
+    }
+    // Numeric MPN only if there was an explicit ECIA prefix
+    if (hadPrefix && mightBeNumericMpn(stripped)) {
+      return {
+        mpn: stripped,
+        quantity: null,
+        distributor: 'mouser',
+        raw: text,
+        confidence: 'low',
       };
     }
     return null;

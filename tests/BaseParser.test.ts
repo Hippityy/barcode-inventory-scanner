@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractQuantity, looksLikeMpn, tryAllParsers } from '@/parsers/BaseParser';
+import { extractQuantity, looksLikeMpn, tryAllParsers, stripEciaPrefixes, mightBeNumericMpn } from '@/parsers/BaseParser';
 import type { BarcodeParser } from '@/parsers/BaseParser';
 import { DigiKeyParser } from '@/parsers/DigiKeyParser';
 import { MouserParser } from '@/parsers/MouserParser';
@@ -54,8 +54,8 @@ describe('looksLikeMpn', () => {
     expect(looksLikeMpn('A')).toBe(false);
   });
 
-  it('returns false for two characters without alphanumeric mix', () => {
-    expect(looksLikeMpn('AB')).toBe(true); // 2 letters, hasLetter=true, length>=2
+  it('returns true for two letters', () => {
+    expect(looksLikeMpn('AB')).toBe(true);
   });
 
   it('returns true for typical MPN with letters and digits', () => {
@@ -84,6 +84,66 @@ describe('looksLikeMpn', () => {
 
   it('returns false for string with special chars outside allowed', () => {
     expect(looksLikeMpn('LM358@')).toBe(false);
+  });
+});
+
+describe('stripEciaPrefixes', () => {
+  it('strips 1P prefix', () => {
+    expect(stripEciaPrefixes('1PMAX123')).toBe('MAX123');
+  });
+
+  it('strips Q prefix', () => {
+    expect(stripEciaPrefixes('Q100')).toBe('100');
+  });
+
+  it('strips 11K prefix', () => {
+    expect(stripEciaPrefixes('11K12345')).toBe('12345');
+  });
+
+  it('prefers longer DI match', () => {
+    expect(stripEciaPrefixes('11KABC')).toBe('ABC');
+  });
+
+  it('returns original when no prefix matches', () => {
+    expect(stripEciaPrefixes('LM358N')).toBe('LM358N');
+  });
+
+  it('trims whitespace after stripping', () => {
+    expect(stripEciaPrefixes('  1P MAX123  ')).toBe('MAX123');
+  });
+
+  it('handles empty string', () => {
+    expect(stripEciaPrefixes('')).toBe('');
+  });
+});
+
+describe('mightBeNumericMpn', () => {
+  it('returns true for 8-digit numeric', () => {
+    expect(mightBeNumericMpn('12345678')).toBe(true);
+  });
+
+  it('returns true for 11-digit numeric (Würth-like)', () => {
+    expect(mightBeNumericMpn('61300511121')).toBe(true);
+  });
+
+  it('returns true for 16-digit numeric', () => {
+    expect(mightBeNumericMpn('1234567890123456')).toBe(true);
+  });
+
+  it('returns false for 7-digit numeric (order code territory)', () => {
+    expect(mightBeNumericMpn('1234567')).toBe(false);
+  });
+
+  it('returns false for 17-digit numeric (too long)', () => {
+    expect(mightBeNumericMpn('12345678901234567')).toBe(false);
+  });
+
+  it('returns false for alphanumeric', () => {
+    expect(mightBeNumericMpn('LM358N')).toBe(false);
+  });
+
+  it('returns false for short quantity', () => {
+    expect(mightBeNumericMpn('100')).toBe(false);
   });
 });
 

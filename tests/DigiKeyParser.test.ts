@@ -40,6 +40,11 @@ describe('DigiKeyParser.canParse', () => {
     expect(parser.canParse(raw)).toBe(true);
   });
 
+  it('returns true for CODE_128 with 1P prefix (numeric)', () => {
+    const raw: RawBarcode = { text: '1P61300511121', format: 'CODE_128' };
+    expect(parser.canParse(raw)).toBe(true);
+  });
+
   it('returns false for empty CODE_128', () => {
     const raw: RawBarcode = { text: '', format: 'CODE_128' };
     expect(parser.canParse(raw)).toBe(false);
@@ -114,6 +119,24 @@ describe('DigiKeyParser.parse', () => {
     expect(result!.mpn).toBeNull();
     expect(result!.quantity).toBeNull();
     expect(result!.distributor).toBe('digikey');
+  });
+
+  it('parses 1D with 1P prefix as MPN (alphanumeric)', () => {
+    const raw: RawBarcode = { text: '1PMAX123', format: 'CODE_128' };
+    const result = parser.parse(raw);
+    expect(result).not.toBeNull();
+    expect(result!.mpn).toBe('MAX123');
+    expect(result!.quantity).toBeNull();
+    expect(result!.confidence).toBe('low');
+  });
+
+  it('parses 1D with 1P prefix as MPN (numeric)', () => {
+    const raw: RawBarcode = { text: '1P61300511121', format: 'CODE_128' };
+    const result = parser.parse(raw);
+    expect(result).not.toBeNull();
+    expect(result!.mpn).toBe('61300511121');
+    expect(result!.quantity).toBeNull();
+    expect(result!.confidence).toBe('low');
   });
 
   it('returns null for 1D that does not match any pattern', () => {

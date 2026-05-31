@@ -128,13 +128,27 @@ describe('filterMultipleBarcodes', () => {
   });
 
   it('falls back to highest-scored result when merge yields nothing', () => {
+    const dkNull: BarcodeParser = {
+      distributor: 'digikey',
+      canParse: () => true,
+      parse: () => ({ mpn: null, quantity: null, distributor: 'digikey', raw: '', confidence: 'low' }),
+    };
+    const e14Qty: BarcodeParser = {
+      distributor: 'element14',
+      canParse: () => true,
+      parse: () => ({ mpn: null, quantity: 10, distributor: 'element14', raw: '', confidence: 'low' }),
+    };
     const barcodes: RawBarcode[] = [
-      { text: '12345678901', format: 'CODE_128' },
-      { text: '12345678902', format: 'CODE_128' },
+      { text: 'a', format: 'CODE_128' },
+      { text: 'b', format: 'CODE_128' },
     ];
-    const result = filterMultipleBarcodes(barcodes, parsers);
+    // e14Qty scores higher (qty populated) so tryAllParsers picks it for each barcode.
+    // mergeComponents sees mpn=null on both → returns null.
+    // Fallback returns the highest-scored individual result, which is element14.
+    const result = filterMultipleBarcodes(barcodes, [dkNull, e14Qty]);
     expect(result).not.toBeNull();
-    expect(result!.distributor).toBe('digikey');
+    expect(result!.distributor).toBe('element14');
+    expect(result!.quantity).toBe(10);
   });
 });
 

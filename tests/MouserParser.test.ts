@@ -25,6 +25,26 @@ describe('MouserParser.canParse', () => {
     expect(parser.canParse(raw)).toBe(true);
   });
 
+  it('returns true for CODE_128 with 1P prefix', () => {
+    const raw: RawBarcode = { text: '1PMAX123', format: 'CODE_128' };
+    expect(parser.canParse(raw)).toBe(true);
+  });
+
+  it('returns true for CODE_128 with 1P prefix (numeric MPN)', () => {
+    const raw: RawBarcode = { text: '1P61300511121', format: 'CODE_128' };
+    expect(parser.canParse(raw)).toBe(true);
+  });
+
+  it('returns false for CODE_128 with 1P prefix but short numeric', () => {
+    const raw: RawBarcode = { text: '1P100', format: 'CODE_128' };
+    expect(parser.canParse(raw)).toBe(false);
+  });
+
+  it('returns false for CODE_128 long numeric without prefix', () => {
+    const raw: RawBarcode = { text: '61300511121', format: 'CODE_128' };
+    expect(parser.canParse(raw)).toBe(false);
+  });
+
   it('returns false for 1D that does not match any pattern', () => {
     const raw: RawBarcode = { text: '???', format: 'CODE_128' };
     expect(parser.canParse(raw)).toBe(false);
@@ -103,6 +123,28 @@ describe('MouserParser.parse', () => {
     expect(result).not.toBeNull();
     expect(result!.mpn).toBe('LM358N');
     expect(result!.confidence).toBe('medium');
+  });
+
+  it('parses 1D with 1P prefix as MPN', () => {
+    const raw: RawBarcode = { text: '1PMAX123', format: 'CODE_128' };
+    const result = parser.parse(raw);
+    expect(result).not.toBeNull();
+    expect(result!.mpn).toBe('MAX123');
+    expect(result!.confidence).toBe('medium');
+  });
+
+  it('parses 1D with 1P prefix numeric as MPN (low confidence)', () => {
+    const raw: RawBarcode = { text: '1P61300511121', format: 'CODE_128' };
+    const result = parser.parse(raw);
+    expect(result).not.toBeNull();
+    expect(result!.mpn).toBe('61300511121');
+    expect(result!.confidence).toBe('low');
+  });
+
+  it('returns null for long numeric without prefix', () => {
+    const raw: RawBarcode = { text: '61300511121', format: 'CODE_128' };
+    const result = parser.parse(raw);
+    expect(result).toBeNull();
   });
 
   it('returns null for 1D that does not match', () => {

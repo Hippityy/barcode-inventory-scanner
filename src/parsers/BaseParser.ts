@@ -31,6 +31,40 @@ export function looksLikeMpn(text: string): boolean {
   return onlyDigitsAndLettersAndSymbols && hasLetter;
 }
 
+/** Known ECIA data identifiers, longest first to avoid partial matches */
+const ECIA_DIS = [
+  '11K', '4L', '4K', '9D', '1T', '1P', '1V', '2P', '3S', '4S',
+  'P', 'Q', 'K', 'S',
+];
+
+/** Strip leading ECIA data identifier from a barcode string.
+ *
+ * Distributors like Würth embed 1D barcodes with ECIA prefixes (e.g. "1P<MPN>").
+ * This removes the prefix so downstream heuristics operate on the actual value.
+ */
+export function stripEciaPrefixes(text: string): string {
+  const trimmed = text.trim();
+  for (const di of ECIA_DIS) {
+    if (trimmed.startsWith(di)) {
+      return trimmed.slice(di.length).trim();
+    }
+  }
+  return trimmed;
+}
+
+/** Weak heuristic for purely numeric MPNs (e.g. Würth 61300511121).
+ *
+ * Distinguishing these from order codes requires external data, so any match
+ * is treated as low-confidence and presented to the user for verification.
+ */
+export function mightBeNumericMpn(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 8 || trimmed.length > 16) {
+    return false;
+  }
+  return /^\d+$/.test(trimmed);
+}
+
 /** Base interface for all barcode parsers */
 export interface BarcodeParser {
   readonly distributor: Distributor;

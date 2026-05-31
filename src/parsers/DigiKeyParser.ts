@@ -1,6 +1,6 @@
 import type { RawBarcode, ParsedComponent } from '@/types/index';
 import type { BarcodeParser } from '@/parsers/BaseParser';
-import { extractQuantity, looksLikeMpn } from '@/parsers/BaseParser';
+import { extractQuantity, looksLikeMpn, stripEciaPrefixes, mightBeNumericMpn } from '@/parsers/BaseParser';
 import { isEciaFormat, parseEciaFields } from '@/parsers/EciaParser';
 
 /** DigiKey barcode parser.
@@ -34,7 +34,7 @@ export class DigiKeyParser implements BarcodeParser {
   }
 
   private looksLikeDigiKey1d(text: string): boolean {
-    const trimmed = text.trim();
+    const trimmed = stripEciaPrefixes(text.trim());
     if (trimmed.length === 0) {
       return false;
     }
@@ -87,18 +87,33 @@ export class DigiKeyParser implements BarcodeParser {
 
   private parse1d(text: string): ParsedComponent | null {
     const trimmed = text.trim();
-    // If it looks like an MPN, treat it as such
-    if (looksLikeMpn(trimmed)) {
+    const stripped = stripEciaPrefixes(trimmed);
+    const hadPrefix = stripped !== trimmed;
+
+    // If it had a 1P/Q/etc prefix, the remainder is very likely an MPN
+    if (hadPrefix && (looksLikeMpn(stripped) || mightBeNumericMpn(stripped))) {
       return {
-        mpn: trimmed,
+        mpn: stripped,
         quantity: null,
         distributor: 'digikey',
         raw: text,
         confidence: 'low',
       };
     }
+
+    // If it looks like an MPN, treat it as such
+    if (looksLikeMpn(stripped)) {
+      return {
+        mpn: stripped,
+        quantity: null,
+        distributor: 'digikey',
+        raw: text,
+        confidence: 'low',
+      };
+    }
+
     // All-numeric long barcode → DigiKey PN (we can't resolve MPN without API)
-    if (/^\d+$/.test(trimmed) && trimmed.length > 10) {
+    if (/^\d+$/.test(stripped) && stripped.length > 10) {
       return {
         mpn: null,
         quantity: null,
