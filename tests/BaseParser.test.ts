@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { extractQuantity, looksLikeMpn, tryAllParsers } from '@/parsers/BaseParser';
+import type { BarcodeParser } from '@/parsers/BaseParser';
 import { DigiKeyParser } from '@/parsers/DigiKeyParser';
 import { MouserParser } from '@/parsers/MouserParser';
 import type { RawBarcode } from '@/types/index';
@@ -73,8 +74,8 @@ describe('looksLikeMpn', () => {
     expect(looksLikeMpn('123')).toBe(false);
   });
 
-  it('returns true for pure numeric long string', () => {
-    expect(looksLikeMpn('12345678')).toBe(true);
+  it('returns false for pure numeric long string', () => {
+    expect(looksLikeMpn('12345678')).toBe(false);
   });
 
   it('returns false for string with spaces', () => {
@@ -93,8 +94,13 @@ describe('tryAllParsers', () => {
   });
 
   it('returns null when parser canParse is true but parse returns null', () => {
-    const raw: RawBarcode = { text: '', format: 'CODE_128' };
-    expect(tryAllParsers(raw, parsers)).toBeNull();
+    const nullParser: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => null,
+    };
+    const raw: RawBarcode = { text: 'anything', format: 'CODE_128' };
+    expect(tryAllParsers(raw, [nullParser])).toBeNull();
   });
 
   it('returns result from single matching parser', () => {
@@ -105,27 +111,91 @@ describe('tryAllParsers', () => {
   });
 
   it('prefers high confidence over medium', () => {
-    // DigiKey 2D ECIA with both fields → high
-    const raw: RawBarcode = {
-      text: '[)>\x1E06\x1D1PLM358\x1DQ100\x1D',
-      format: 'DATA_MATRIX',
+    const mediumParser: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'MED', quantity: null, distributor: 'unknown', raw: 'm', confidence: 'medium' }),
     };
-    const result = tryAllParsers(raw, parsers);
+    const highParser: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'HIGH', quantity: 10, distributor: 'unknown', raw: 'h', confidence: 'high' }),
+    };
+    const raw: RawBarcode = { text: 'test', format: 'CODE_128' };
+    const result = tryAllParsers(raw, [mediumParser, highParser]);
     expect(result).not.toBeNull();
     expect(result!.confidence).toBe('high');
+    expect(result!.mpn).toBe('HIGH');
   });
 
-  it('prefers result with more populated fields', () => {
-    const dk = new DigiKeyParser();
-    const mouser = new MouserParser();
-    const customParsers = [dk, mouser];
-    // Mouser 2D with MPN only (medium) should still be returned
-    const raw: RawBarcode = {
-      text: '>[)>\x1E06\x1D1PLM358\x1D',
-      format: 'DATA_MATRIX',
+  it('prefers result with more populated fields at same confidence', () => {
+    const lowMpnOnly: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'ABC', quantity: null, distributor: 'unknown', raw: 'x', confidence: 'low' }),
     };
-    const result = tryAllParsers(raw, customParsers);
+    const lowBothFields: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'XYZ', quantity: 10, distributor: 'unknown', raw: 'y', confidence: 'low' }),
+    };
+    const raw: RawBarcode = { text: 'test', format: 'CODE_128' };
+    const result = tryAllParsers(raw, [lowMpnOnly, lowBothFields]);
     expect(result).not.toBeNull();
-    expect(result!.distributor).toBe('mouser');
+    expect(result!.mpn).toBe('XYZ');
+    expect(result!.quantity).toBe(10);
+  });
+
+  it('prefers medium over low confidence', () => {
+    const lowParser: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'LOW', quantity: null, distributor: 'unknown', raw: 'l', confidence: 'low' }),
+    };
+    const mediumParser: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'MED', quantity: null, distributor: 'unknown', raw: 'm', confidence: 'medium' }),
+    };
+    const raw: RawBarcode = { text: 'test', format: 'CODE_128' };
+    const result = tryAllParsers(raw, [lowParser, mediumParser]);
+    expect(result).not.toBeNull();
+    expect(result!.confidence).toBe('medium');
+  });
+
+  it('handles opposite field coverage for score calculation', () => {
+    const mpnOnly: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: 'A', quantity: null, distributor: 'unknown', raw: 'x', confidence: 'low' }),
+    };
+    const qtyOnly: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: null, quantity: 10, distributor: 'unknown', raw: 'y', confidence: 'low' }),
+    };
+    const raw: RawBarcode = { text: 'test', format: 'CODE_128' };
+    const result = tryAllParsers(raw, [mpnOnly, qtyOnly]);
+    expect(result).not.toBeNull();
+    // When scores tie, best keeps first
+    expect(result!.mpn).toBe('A');
+  });
+
+  it('covers best.mpn falsy branch in score comparison', () => {
+    const qtyFirst: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: null, quantity: 5, distributor: 'unknown', raw: 'x', confidence: 'low' }),
+    };
+    const qtySecond: BarcodeParser = {
+      distributor: 'unknown',
+      canParse: () => true,
+      parse: () => ({ mpn: null, quantity: 10, distributor: 'unknown', raw: 'y', confidence: 'low' }),
+    };
+    const raw: RawBarcode = { text: 'test', format: 'CODE_128' };
+    const result = tryAllParsers(raw, [qtyFirst, qtySecond]);
+    expect(result).not.toBeNull();
+    // Scores tie (both have only qty), so best stays first
+    expect(result!.quantity).toBe(5);
   });
 });

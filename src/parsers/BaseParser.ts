@@ -25,11 +25,10 @@ export function looksLikeMpn(text: string): boolean {
   if (trimmed.length < 2) {
     return false;
   }
-  // Must contain at least one letter if longer than 6 chars, or have mixed alphanumeric
   const hasLetter = /[A-Za-z]/.test(trimmed);
-  const hasDigit = /\d/.test(trimmed);
   const onlyDigitsAndLettersAndSymbols = /^[A-Za-z0-9\-_.\/]+$/.test(trimmed);
-  return onlyDigitsAndLettersAndSymbols && (hasLetter || (hasDigit && trimmed.length > 6));
+  // Must contain at least one letter (true MPNs are never pure numeric)
+  return onlyDigitsAndLettersAndSymbols && hasLetter;
 }
 
 /** Base interface for all barcode parsers */

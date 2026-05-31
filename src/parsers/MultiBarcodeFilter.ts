@@ -3,7 +3,7 @@ import type { BarcodeParser } from '@/parsers/BaseParser';
 import { tryAllParsers } from '@/parsers/BaseParser';
 
 /** Score a parsed component for ranking. Higher is better. */
-function scoreComponent(pc: ParsedComponent): number {
+export function scoreComponent(pc: ParsedComponent): number {
   let score = 0;
   if (pc.confidence === 'high') {
     score += 100;
@@ -26,7 +26,7 @@ function scoreComponent(pc: ParsedComponent): number {
  * When we have multiple 1D barcodes from the same label, we can try
  * to combine an MPN barcode with a quantity barcode.
  */
-function mergeComponents(components: readonly ParsedComponent[]): ParsedComponent | null {
+export function mergeComponents(components: readonly ParsedComponent[]): ParsedComponent | null {
   if (components.length === 0) {
     return null;
   }

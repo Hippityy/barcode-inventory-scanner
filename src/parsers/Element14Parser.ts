@@ -26,6 +26,10 @@ export class Element14Parser implements BarcodeParser {
     if (/^\d{6,8}$/.test(trimmed)) {
       return true;
     }
+    // Short numeric (1-5 digits) → likely quantity
+    if (/^\d{1,5}$/.test(trimmed)) {
+      return true;
+    }
     // Alphanumeric MPN
     if (looksLikeMpn(trimmed)) {
       return true;

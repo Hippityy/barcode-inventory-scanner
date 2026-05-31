@@ -21,12 +21,10 @@ export function parseEciaFields(data: string): Map<string, string> {
   let content = data;
 
   // Strip known prefix variations
-  if (content.includes('[)>')) {
-    const idx = content.indexOf('[)>') + 3; // after "[)>"
-    content = content.slice(idx);
-  } else if (content.includes('>[)>')) {
-    const idx = content.indexOf('>[)>') + 4; // after ">[)>"
-    content = content.slice(idx);
+  if (content.startsWith('[)>')) {
+    content = content.slice(3); // after "[)>"
+  } else if (content.startsWith('>[)>')) {
+    content = content.slice(4); // after ">[)>"
   }
 
   // Skip past RS06GS header tail if present
@@ -37,11 +35,10 @@ export function parseEciaFields(data: string): Map<string, string> {
   }
 
   // Remove trailing EOT if present
-  if (content.endsWith(EOT)) {
-    content = content.slice(0, -1);
-  }
   if (content.endsWith(RS + EOT)) {
     content = content.slice(0, -(RS + EOT).length);
+  } else if (content.endsWith(EOT)) {
+    content = content.slice(0, -1);
   }
 
   // Split by Group Separator
