@@ -1,6 +1,6 @@
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { Result } from '@zxing/library';
-import type { RawBarcode } from '../types/index.ts';
+import type { RawBarcode } from '@/types/index';
 
 /** Options for the barcode scanner */
 export interface ScannerOptions {

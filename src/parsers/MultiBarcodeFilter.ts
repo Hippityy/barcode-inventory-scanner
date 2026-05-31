@@ -1,6 +1,6 @@
-import type { RawBarcode, ParsedComponent } from '../types/index.ts';
-import type { BarcodeParser } from './BaseParser.ts';
-import { tryAllParsers } from './BaseParser.ts';
+import type { RawBarcode, ParsedComponent } from '@/types/index';
+import type { BarcodeParser } from '@/parsers/BaseParser';
+import { tryAllParsers } from '@/parsers/BaseParser';
 
 /** Score a parsed component for ranking. Higher is better. */
 function scoreComponent(pc: ParsedComponent): number {

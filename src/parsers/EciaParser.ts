@@ -7,12 +7,17 @@ const RS = '\x1E'; // Record Separator
 const GS = '\x1D'; // Group Separator
 const EOT = '\x04'; // End of Transmission
 
+/** Known ECIA data identifiers, longest first to avoid partial matches */
+const KNOWN_DIS = [
+  '11K', '4L', '4K', '9D', '1T', '1P', '1V', '2P', '3S', '4S',
+  'P', 'Q', 'K', 'S',
+];
+
 /** Extract fields from an ECIA Format 06 barcode string */
 export function parseEciaFields(data: string): Map<string, string> {
   const fields = new Map<string, string>();
 
   // Find the start of actual data after the header
-  // Headers: "[)>\x1E06\x1D" or ">[)>\x1E06\x1D"
   let content = data;
 
   // Strip known prefix variations
@@ -48,12 +53,17 @@ export function parseEciaFields(data: string): Map<string, string> {
       continue;
     }
 
-    // Data identifiers are 1-2 uppercase letters or digits
-    // Common ones: 1P, Q, K, 4K, 9D, 1T, 4L, 11K, P, S, 2P, 1V, 3S, 4S
-    const match = trimmed.match(/^([A-Z0-9]{1,3})(.+)$/);
-    if (match) {
-      const [, di, value] = match;
-      fields.set(di, value.trim());
+    // Try to match a known DI at the start
+    let matchedDi: string | null = null;
+    for (const di of KNOWN_DIS) {
+      if (trimmed.startsWith(di)) {
+        matchedDi = di;
+        break;
+      }
+    }
+
+    if (matchedDi !== null) {
+      fields.set(matchedDi, trimmed.slice(matchedDi.length));
     }
   }
 

@@ -1,10 +1,10 @@
-import { BarcodeScannerEngine } from './scanner/BarcodeScannerEngine.ts';
-import { DigiKeyParser } from './parsers/DigiKeyParser.ts';
-import { MouserParser } from './parsers/MouserParser.ts';
-import { Element14Parser } from './parsers/Element14Parser.ts';
-import { filterMultipleBarcodes } from './parsers/MultiBarcodeFilter.ts';
-import { UIManager } from './ui/UIManager.ts';
-import type { RawBarcode } from './types/index.ts';
+import { BarcodeScannerEngine } from '@/scanner/BarcodeScannerEngine';
+import { DigiKeyParser } from '@/parsers/DigiKeyParser';
+import { MouserParser } from '@/parsers/MouserParser';
+import { Element14Parser } from '@/parsers/Element14Parser';
+import { filterMultipleBarcodes } from '@/parsers/MultiBarcodeFilter';
+import { UIManager } from '@/ui/UIManager';
+import type { RawBarcode } from '@/types/index';
 
 /** Main application controller.
  *

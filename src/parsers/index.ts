@@ -1,7 +1,7 @@
-export { DigiKeyParser } from './DigiKeyParser.ts';
-export { MouserParser } from './MouserParser.ts';
-export { Element14Parser } from './Element14Parser.ts';
-export { filterMultipleBarcodes } from './MultiBarcodeFilter.ts';
-export { tryAllParsers, extractQuantity, looksLikeMpn } from './BaseParser.ts';
-export type { BarcodeParser } from './BaseParser.ts';
-export { isEciaFormat, parseEciaFields } from './EciaParser.ts';
+export { DigiKeyParser } from '@/parsers/DigiKeyParser';
+export { MouserParser } from '@/parsers/MouserParser';
+export { Element14Parser } from '@/parsers/Element14Parser';
+export { filterMultipleBarcodes } from '@/parsers/MultiBarcodeFilter';
+export { tryAllParsers, extractQuantity, looksLikeMpn } from '@/parsers/BaseParser';
+export type { BarcodeParser } from '@/parsers/BaseParser';
+export { isEciaFormat, parseEciaFields } from '@/parsers/EciaParser';

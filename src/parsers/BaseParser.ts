@@ -1,4 +1,4 @@
-import type { RawBarcode, ParsedComponent, Distributor } from '../types/index.ts';
+import type { RawBarcode, ParsedComponent, Distributor } from '@/types/index';
 
 /** Extract numeric quantity from a string, or null if not valid/parsable */
 export function extractQuantity(qtyStr: string): number | null {

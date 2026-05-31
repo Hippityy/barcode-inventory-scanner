@@ -1,4 +1,4 @@
-import type { ScanRecord, ParsedComponent } from '../types/index.ts';
+import type { ScanRecord, ParsedComponent } from '@/types/index';
 
 /** Generates a short unique ID */
 function makeId(): string {

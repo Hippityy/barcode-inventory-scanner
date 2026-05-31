@@ -1,7 +1,7 @@
-import type { RawBarcode, ParsedComponent } from '../types/index.ts';
-import type { BarcodeParser } from './BaseParser.ts';
-import { extractQuantity, looksLikeMpn } from './BaseParser.ts';
-import { isEciaFormat, parseEciaFields } from './EciaParser.ts';
+import type { RawBarcode, ParsedComponent } from '@/types/index';
+import type { BarcodeParser } from '@/parsers/BaseParser';
+import { extractQuantity, looksLikeMpn } from '@/parsers/BaseParser';
+import { isEciaFormat, parseEciaFields } from '@/parsers/EciaParser';
 
 /** Mouser barcode parser.
  *

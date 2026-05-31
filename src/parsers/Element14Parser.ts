@@ -1,6 +1,6 @@
-import type { RawBarcode, ParsedComponent } from '../types/index.ts';
-import type { BarcodeParser } from './BaseParser.ts';
-import { extractQuantity, looksLikeMpn } from './BaseParser.ts';
+import type { RawBarcode, ParsedComponent } from '@/types/index';
+import type { BarcodeParser } from '@/parsers/BaseParser';
+import { extractQuantity, looksLikeMpn } from '@/parsers/BaseParser';
 
 /** Element14 (Farnell) barcode parser.
  *
