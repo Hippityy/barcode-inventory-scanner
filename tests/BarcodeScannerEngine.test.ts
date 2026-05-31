@@ -363,6 +363,35 @@ describe('BarcodeScannerEngine', () => {
       expect(mocks.BarcodeDetector).toHaveBeenCalledOnce();
     });
 
+    it('treats empty formats array as no filter', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine(
+        { formats: [] },
+        cb
+      );
+      await engine.start(stubVideo());
+
+      expect(mocks.BarcodeDetector).toHaveBeenCalledOnce();
+      expect(mocks.BarcodeDetector).toHaveBeenCalledWith({
+        formats: undefined,
+      });
+    });
+
+    it('ignores a different video element when already running', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      const video1 = stubVideo();
+      const video2 = stubVideo();
+
+      await engine.start(video1);
+      await engine.start(video2); // second call — should be ignored
+      await rafCtrl.step();
+
+      // Engine should still be bound to the first video
+      expect(mocks.BarcodeDetector).toHaveBeenCalledOnce();
+      expect(mocks.prepareZXingModule).toHaveBeenCalledOnce();
+    });
+
     it('maps unknown detector formats to UNKNOWN', async () => {
       mocks.detect.mockResolvedValue([
         {
@@ -494,6 +523,36 @@ describe('BarcodeScannerEngine', () => {
       expect(cb.onDetect).not.toHaveBeenCalled();
       expect(cb.onError).not.toHaveBeenCalled();
     });
+
+    it('guards scanLoop when videoElement is null', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      engine.stop();
+      // Force isRunning true but null videoElement to hit the second guard
+      (engine as any).isRunning = true;
+      (engine as any).videoElement = null;
+      (engine as any).detector = { detect: mocks.detect };
+      (engine as any).scanLoop();
+      expect(mocks.detect).not.toHaveBeenCalled();
+      expect(cb.onDetect).not.toHaveBeenCalled();
+      expect(cb.onError).not.toHaveBeenCalled();
+    });
+
+    it('guards scanLoop when detector is null', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      engine.stop();
+      // Force isRunning true and videoElement set, but null detector
+      (engine as any).isRunning = true;
+      (engine as any).videoElement = stubVideo();
+      (engine as any).detector = null;
+      (engine as any).scanLoop();
+      expect(mocks.detect).not.toHaveBeenCalled();
+      expect(cb.onDetect).not.toHaveBeenCalled();
+      expect(cb.onError).not.toHaveBeenCalled();
+    });
   });
 
   describe('format mapping', () => {
@@ -550,6 +609,67 @@ describe('BarcodeScannerEngine', () => {
       expect(mocks.BarcodeDetector).toHaveBeenCalledWith({
         formats: ['unknown'],
       });
+    });
+  });
+
+  describe('concurrency', () => {
+    it('multiple engines create independent detectors', async () => {
+      const cb1 = makeCallbacks();
+      const cb2 = makeCallbacks();
+      const engine1 = new BarcodeScannerEngine({ formats: ['CODE_128'] }, cb1);
+      const engine2 = new BarcodeScannerEngine({ formats: ['QR_CODE'] }, cb2);
+
+      const video1 = stubVideo();
+      const video2 = stubVideo();
+
+      await engine1.start(video1);
+      await engine2.start(video2);
+
+      // Each engine should have created its own BarcodeDetector
+      expect(mocks.BarcodeDetector).toHaveBeenCalledTimes(2);
+      expect(mocks.BarcodeDetector).toHaveBeenNthCalledWith(1, { formats: ['code_128'] });
+      expect(mocks.BarcodeDetector).toHaveBeenNthCalledWith(2, { formats: ['qr_code'] });
+      expect(mocks.prepareZXingModule).toHaveBeenCalledTimes(2);
+    });
+
+    it('stopping one engine does not affect another', async () => {
+      mocks.detect.mockResolvedValue([
+        { rawValue: 'A', format: 'code_128', boundingBox: new DOMRectReadOnly(0, 0, 1, 1), cornerPoints: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] },
+      ]);
+
+      const cb1 = makeCallbacks();
+      const cb2 = makeCallbacks();
+      const engine1 = new BarcodeScannerEngine({}, cb1);
+      const engine2 = new BarcodeScannerEngine({}, cb2);
+
+      await engine1.start(stubVideo());
+      await engine2.start(stubVideo());
+
+      // Step through both initial rAF callbacks
+      await rafCtrl.step(); // engine1 scanLoop
+      await rafCtrl.step(); // engine2 scanLoop
+
+      expect(cb1.onDetect).toHaveBeenCalledOnce();
+      expect(cb2.onDetect).toHaveBeenCalledOnce();
+
+      // Stop engine1
+      engine1.stop();
+
+      // Clear mocks so we only see engine2's next scan
+      mocks.detect.mockClear();
+      mocks.detect.mockResolvedValue([]); // follow-up scans are empty
+      (cb1.onDetect as ReturnType<typeof vi.fn>).mockClear();
+      (cb2.onDetect as ReturnType<typeof vi.fn>).mockClear();
+
+      // Both engines queued follow-up rAFs. Step through them.
+      // engine1's next callback should bail because isRunning is false.
+      // engine2's next callback should proceed (but find nothing).
+      await rafCtrl.step(); // engine1 follow-up (bails)
+      await rafCtrl.step(); // engine2 follow-up (runs, empty)
+
+      expect(cb1.onDetect).not.toHaveBeenCalled();
+      expect(cb2.onDetect).not.toHaveBeenCalled(); // empty frame => no onDetect
+      expect(cb2.onError).not.toHaveBeenCalled();  // and no errors either
     });
   });
 });
