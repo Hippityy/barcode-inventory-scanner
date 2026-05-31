@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Barcode Inventory Scanner</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Barcode Inventory Scanner</h1>
+      <p class="subtitle">DigiKey · Mouser · Element14</p>
+    </header>
+
+    <section class="camera-section">
+      <div class="video-wrapper">
+        <video id="scanner-video" autoplay muted playsinline></video>
+        <div class="overlay">
+          <div class="reticle"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="btn-start" class="btn-primary">Start Camera</button>
+        <button id="btn-stop" class="btn-secondary">Stop</button>
+      </div>
+      <p id="scanner-status" class="status">Camera inactive</p>
+    </section>
+
+    <section class="last-scan">
+      <h2>Last Scan</h2>
+      <div class="last-scan-grid">
+        <div class="field">
+          <span class="label">MPN</span>
+          <span id="last-scan-mpn" class="value">—</span>
+          <button class="btn-copy" data-target="last-scan-mpn">Copy</button>
+        </div>
+        <div class="field">
+          <span class="label">Qty</span>
+          <span id="last-scan-qty" class="value">—</span>
+          <button class="btn-copy" data-target="last-scan-qty">Copy</button>
+        </div>
+        <div class="field">
+          <span class="label">Source</span>
+          <span id="last-scan-dist" class="value">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="history">
+      <div class="history-header">
+        <h2>Scan History <span id="scan-count" class="badge">0</span></h2>
+        <div class="history-actions">
+          <button id="btn-clear" class="btn-secondary">Clear</button>
+          <button id="btn-export" class="btn-secondary">Export CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>MPN</th>
+              <th>Qty</th>
+              <th>Source</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
