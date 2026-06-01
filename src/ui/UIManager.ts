@@ -200,15 +200,27 @@ export class UIManager {
     const actionsCell = document.createElement('td');
     const copyMpnBtn = document.createElement('button');
     copyMpnBtn.textContent = 'Copy MPN';
-    copyMpnBtn.addEventListener('click', () => this.copyToClipboard(record.mpn, `MPN ${record.mpn}`));
+    copyMpnBtn.addEventListener('click', async () => {
+      if (await this.copyToClipboard(record.mpn)) {
+        this.showToast(`Copied MPN ${record.mpn}`, 'info');
+      }
+    });
 
     const copyQtyBtn = document.createElement('button');
     copyQtyBtn.textContent = 'Copy Qty';
-    copyQtyBtn.addEventListener('click', () => this.copyToClipboard(String(record.quantity), `Qty ${record.quantity}`));
+    copyQtyBtn.addEventListener('click', async () => {
+      if (await this.copyToClipboard(String(record.quantity))) {
+        this.showToast(`Copied Qty ${record.quantity}`, 'info');
+      }
+    });
 
     const copyRowBtn = document.createElement('button');
     copyRowBtn.textContent = 'Copy Row';
-    copyRowBtn.addEventListener('click', () => this.copyToClipboard(`${record.mpn}\t${record.quantity}`, `row`));
+    copyRowBtn.addEventListener('click', async () => {
+      if (await this.copyToClipboard(`${record.mpn}\t${record.quantity}`)) {
+        this.showToast('Copied row', 'info');
+      }
+    });
 
     actionsCell.appendChild(copyMpnBtn);
     actionsCell.appendChild(copyQtyBtn);
@@ -235,26 +247,36 @@ export class UIManager {
     this.updateCount();
   }
 
-  private async copyToClipboard(text: string, label: string): Promise<void> {
+  /** Write text to clipboard. Returns true on success. */
+  private async copyToClipboard(text: string): Promise<boolean> {
     try {
       await navigator.clipboard.writeText(text);
+      return true;
     } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
+      // Fallback for older browsers — execCommand requires a user gesture
+      // (so this only works inside click handlers, not auto-copy on scan).
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return ok;
+      } catch {
+        return false;
+      }
     }
-    this.showToast(`Copied ${label}`, 'info');
   }
 
-  /** Copy MPN to clipboard and show feedback toast */
-  copyMpn(mpn: string): void {
-    this.copyToClipboard(mpn, `MPN ${mpn}`);
+  /** Copy MPN to clipboard and show feedback toast (called on scan auto-copy) */
+  async copyMpn(mpn: string): Promise<void> {
+    const ok = await this.copyToClipboard(mpn);
+    if (ok) {
+      this.showToast(`Copied MPN ${mpn}`, 'info');
+    }
   }
 
   private exportCsv(): void {
