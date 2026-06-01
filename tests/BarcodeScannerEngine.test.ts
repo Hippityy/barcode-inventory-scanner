@@ -58,8 +58,17 @@ function makeCallbacks(): ScannerCallbacks {
   };
 }
 
-function stubVideo(): HTMLVideoElement {
-  return document.createElement('video');
+/** Create a stub video element.  By default it looks "ready" to the engine
+ *  (readyState ≥ 2 and non-zero dimensions).  Pass `ready: false` to test
+ *  the readiness guard. */
+function stubVideo(ready = true): HTMLVideoElement {
+  const v = document.createElement('video');
+  if (ready) {
+    Object.defineProperty(v, 'readyState', { value: 2, writable: true });
+    Object.defineProperty(v, 'videoWidth', { value: 640, writable: true });
+    Object.defineProperty(v, 'videoHeight', { value: 480, writable: true });
+  }
+  return v;
 }
 
 /** Manual rAF controller — queues callbacks and fires them only when told. */
@@ -141,6 +150,30 @@ describe('BarcodeScannerEngine', () => {
       expect(mocks.prepareZXingModule).toHaveBeenCalledOnce();
     });
 
+    it('fires onReady when scanning starts', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      expect(cb.onReady).toHaveBeenCalledOnce();
+    });
+
+    it('does not fire onReady when start fails', async () => {
+      mocks.prepareZXingModule.mockRejectedValue(new Error('WASM fail'));
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      expect(cb.onReady).not.toHaveBeenCalled();
+      expect(cb.onError).toHaveBeenCalledOnce();
+    });
+
+    it('fires onReady only once per start', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await engine.start(stubVideo()); // idempotent
+      expect(cb.onReady).toHaveBeenCalledOnce();
+    });
+
     it('creates BarcodeDetector with no format filter when formats omitted', async () => {
       const cb = makeCallbacks();
       const engine = new BarcodeScannerEngine({}, cb);
@@ -195,48 +228,6 @@ describe('BarcodeScannerEngine', () => {
       expect(emitted[0].cornerPoints).toHaveLength(4);
     });
 
-    it('fires onReady only after the first successful detection', async () => {
-      // First two frames empty, third frame has a barcode
-      mocks.detect
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { rawValue: 'X', format: 'qr_code', boundingBox: new DOMRectReadOnly(0, 0, 1, 1), cornerPoints: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] },
-        ]);
-
-      const cb = makeCallbacks();
-      const engine = new BarcodeScannerEngine({}, cb);
-      await engine.start(stubVideo());
-
-      await rafCtrl.step(); // frame 1 — empty
-      await rafCtrl.step(); // frame 2 — empty
-      await rafCtrl.step(); // frame 3 — barcode found
-
-      expect(cb.onReady).toHaveBeenCalledOnce();
-      expect(cb.onDetect).toHaveBeenCalledOnce();
-    });
-
-    it('fires onReady only once even across multiple consecutive detections', async () => {
-      mocks.detect
-        .mockResolvedValueOnce([
-          { rawValue: 'A', format: 'code_128', boundingBox: new DOMRectReadOnly(0, 0, 1, 1), cornerPoints: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] },
-        ])
-        .mockResolvedValueOnce([
-          { rawValue: 'B', format: 'code_128', boundingBox: new DOMRectReadOnly(0, 0, 1, 1), cornerPoints: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] },
-        ]);
-
-      const cb = makeCallbacks();
-      const engine = new BarcodeScannerEngine({}, cb);
-      await engine.start(stubVideo());
-
-      await rafCtrl.step(); // first detection
-      expect(cb.onReady).toHaveBeenCalledOnce();
-
-      await rafCtrl.step(); // second detection
-      expect(cb.onReady).toHaveBeenCalledOnce(); // still only once
-      expect(cb.onDetect).toHaveBeenCalledTimes(2);
-    });
-
     it('does not emit onDetect when no barcodes are found', async () => {
       mocks.detect.mockResolvedValue([]);
       const cb = makeCallbacks();
@@ -245,7 +236,8 @@ describe('BarcodeScannerEngine', () => {
       await rafCtrl.steps(3);
 
       expect(cb.onDetect).not.toHaveBeenCalled();
-      expect(cb.onReady).not.toHaveBeenCalled();
+      // onReady fired during start(), so it should have been called
+      expect(cb.onReady).toHaveBeenCalledOnce();
     });
 
     it('calls onError when WASM preparation fails', async () => {
@@ -271,8 +263,8 @@ describe('BarcodeScannerEngine', () => {
       expect(cb.onError).toHaveBeenCalledWith(new Error('plain string error'));
     });
 
-    it('calls onError when detector.detect throws', async () => {
-      const err = new Error('Detection failure');
+    it('calls onError when detector.detect throws a real error', async () => {
+      const err = new Error('WASM crash');
       mocks.detect.mockRejectedValue(err);
 
       const cb = makeCallbacks();
@@ -285,7 +277,7 @@ describe('BarcodeScannerEngine', () => {
     });
 
     it('calls onError with wrapped non-Error when detector.detect rejects with a string', async () => {
-      mocks.detect.mockRejectedValue('bad detect');
+      mocks.detect.mockRejectedValue('WASM crash');
 
       const cb = makeCallbacks();
       const engine = new BarcodeScannerEngine({}, cb);
@@ -293,7 +285,72 @@ describe('BarcodeScannerEngine', () => {
       await rafCtrl.step();
 
       expect(cb.onError).toHaveBeenCalledOnce();
-      expect(cb.onError).toHaveBeenCalledWith(new Error('bad detect'));
+      expect(cb.onError).toHaveBeenCalledWith(new Error('WASM crash'));
+    });
+
+    it('does not call onError for generic "not found" text', async () => {
+      const notFound = new Error('Barcode not found in image');
+      mocks.detect.mockRejectedValue(notFound);
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await rafCtrl.steps(3);
+
+      expect(cb.onError).not.toHaveBeenCalled();
+      expect(cb.onDetect).not.toHaveBeenCalled();
+    });
+
+    it('calls onError for an object without a message property', async () => {
+      mocks.detect.mockRejectedValue({ code: 42 });
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await rafCtrl.step();
+
+      expect(cb.onError).toHaveBeenCalledOnce();
+      expect(cb.onError).toHaveBeenCalledWith(new Error('[object Object]'));
+    });
+
+    it('does not call onError for NotFoundException (no barcode in frame)', async () => {
+      const notFound = new Error('No MultiFormat Readers were able to detect the code.');
+      mocks.detect.mockRejectedValue(notFound);
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await rafCtrl.steps(3);
+
+      expect(cb.onError).not.toHaveBeenCalled();
+      expect(cb.onDetect).not.toHaveBeenCalled();
+    });
+
+    it('does not call onError for InvalidStateError from unready video', async () => {
+      const invalidState = new DOMException('Invalid element or state.', 'InvalidStateError');
+      mocks.detect.mockRejectedValue(invalidState);
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await rafCtrl.steps(3);
+
+      expect(cb.onError).not.toHaveBeenCalled();
+    });
+
+    it('does not call onError for ponyfill NotSupportedError wrapping NotFound', async () => {
+      const wrapped = new DOMException(
+        "Failed to execute 'detect' on 'BarcodeDetector': Barcode detection service unavailable.",
+        'NotSupportedError'
+      );
+      mocks.detect.mockRejectedValue(wrapped);
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await rafCtrl.steps(3);
+
+      expect(cb.onError).not.toHaveBeenCalled();
     });
 
     it('does not re-queue rAF if engine is stopped during onDetect callback', async () => {
@@ -315,7 +372,7 @@ describe('BarcodeScannerEngine', () => {
     });
 
     it('does not re-queue rAF if engine is stopped during onError callback', async () => {
-      mocks.detect.mockRejectedValue(new Error('boom'));
+      mocks.detect.mockRejectedValue(new Error('WASM crash'));
 
       const cb = makeCallbacks();
       const engine = new BarcodeScannerEngine({}, cb);
@@ -330,8 +387,8 @@ describe('BarcodeScannerEngine', () => {
       expect(rafSpy).toHaveBeenCalledTimes(1); // only the initial start() rAF
     });
 
-    it('continues scanning after a detection error', async () => {
-      const err = new Error('Transient');
+    it('continues scanning after a real detection error', async () => {
+      const err = new Error('WASM crash');
       mocks.detect
         .mockRejectedValueOnce(err)
         .mockResolvedValueOnce([
@@ -412,6 +469,46 @@ describe('BarcodeScannerEngine', () => {
     });
   });
 
+  describe('video readiness', () => {
+    it('skips frames while video is not ready', async () => {
+      const unready = stubVideo(false); // readyState = 0, no dimensions
+      mocks.detect.mockResolvedValue([
+        { rawValue: 'A', format: 'code_128', boundingBox: new DOMRectReadOnly(0, 0, 1, 1), cornerPoints: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] },
+      ]);
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(unready);
+
+      // Step several times while video is unready
+      await rafCtrl.steps(3);
+      expect(mocks.detect).not.toHaveBeenCalled();
+      expect(cb.onDetect).not.toHaveBeenCalled();
+
+      // Now make it ready
+      Object.defineProperty(unready, 'readyState', { value: 2, writable: true });
+      Object.defineProperty(unready, 'videoWidth', { value: 640, writable: true });
+      Object.defineProperty(unready, 'videoHeight', { value: 480, writable: true });
+
+      await rafCtrl.step();
+      expect(mocks.detect).toHaveBeenCalledOnce();
+      expect(cb.onDetect).toHaveBeenCalledOnce();
+    });
+
+    it('skips frames while video has zero dimensions', async () => {
+      const zeroDim = stubVideo(false);
+      Object.defineProperty(zeroDim, 'readyState', { value: 2, writable: true });
+      // videoWidth and videoHeight stay at 0
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(zeroDim);
+      await rafCtrl.steps(3);
+
+      expect(mocks.detect).not.toHaveBeenCalled();
+    });
+  });
+
   describe('stop', () => {
     it('cancels the animation frame loop', async () => {
       const cb = makeCallbacks();
@@ -456,6 +553,7 @@ describe('BarcodeScannerEngine', () => {
 
       await engine.start(stubVideo());
       expect(mocks.prepareZXingModule).toHaveBeenCalledOnce();
+      expect(cb.onReady).toHaveBeenCalledTimes(2); // once per start
     });
 
     it('is safe to stop an engine that was never started', () => {
@@ -492,7 +590,6 @@ describe('BarcodeScannerEngine', () => {
       await new Promise((r) => setTimeout(r, 0)); // let microtasks settle
 
       expect(cb.onDetect).not.toHaveBeenCalled();
-      expect(cb.onReady).not.toHaveBeenCalled();
     });
 
     it('does not process detection error if engine is stopped while detect() is pending', async () => {

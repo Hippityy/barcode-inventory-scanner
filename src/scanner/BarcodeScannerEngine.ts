@@ -1,5 +1,4 @@
-import { BarcodeDetector } from 'barcode-detector/ponyfill';
-import { prepareZXingModule } from 'barcode-detector/ponyfill';
+import { BarcodeDetector, prepareZXingModule, type BarcodeDetectorOptions } from 'barcode-detector/ponyfill';
 import type { RawBarcode } from '@/types/index';
 
 /** Options for the barcode scanner */
@@ -29,7 +28,6 @@ export class BarcodeScannerEngine {
   private isRunning = false;
   private rafId: number | null = null;
   private videoElement: HTMLVideoElement | null = null;
-  private hasFiredReady = false;
 
   constructor(options: ScannerOptions, callbacks: ScannerCallbacks) {
     this.options = options;
@@ -53,10 +51,11 @@ export class BarcodeScannerEngine {
         : undefined;
 
       this.detector = new BarcodeDetector({
-        formats: detectorFormats,
+        formats: detectorFormats as unknown as BarcodeDetectorOptions['formats'],
       });
 
       this.rafId = requestAnimationFrame(() => this.scanLoop());
+      this.callbacks.onReady?.();
     } catch (err) {
       this.isRunning = false;
       this.callbacks.onError(err instanceof Error ? err : new Error(String(err)));
@@ -72,11 +71,21 @@ export class BarcodeScannerEngine {
     }
     this.videoElement = null;
     this.detector = null;
-    this.hasFiredReady = false;
   }
 
   private scanLoop(): void {
     if (!this.isRunning || !this.videoElement || !this.detector) {
+      return;
+    }
+
+    // Wait for the video element to have actual frame data before asking
+    // the detector to process it.  readyState >= 2 means HAVE_CURRENT_DATA.
+    if (
+      this.videoElement.readyState < 2 ||
+      this.videoElement.videoWidth === 0 ||
+      this.videoElement.videoHeight === 0
+    ) {
+      this.rafId = requestAnimationFrame(() => this.scanLoop());
       return;
     }
 
@@ -86,11 +95,6 @@ export class BarcodeScannerEngine {
         if (!this.isRunning) return;
 
         if (detected.length > 0) {
-          if (!this.hasFiredReady) {
-            this.hasFiredReady = true;
-            this.callbacks.onReady?.();
-          }
-
           const barcodes: RawBarcode[] = detected.map((d) => ({
             text: d.rawValue,
             format: this.mapFormatFromDetector(d.format),
@@ -107,11 +111,32 @@ export class BarcodeScannerEngine {
       })
       .catch((err) => {
         if (!this.isRunning) return;
+
+        // ZXing throws when no barcode is found in a frame — ignore it
+        // and keep scanning.  The ponyfill may wrap it in a DOMException.
+        if (this.isNotFoundError(err)) {
+          this.rafId = requestAnimationFrame(() => this.scanLoop());
+          return;
+        }
+
         this.callbacks.onError(err instanceof Error ? err : new Error(String(err)));
         if (this.isRunning) {
           this.rafId = requestAnimationFrame(() => this.scanLoop());
         }
       });
+  }
+
+  /** Determine whether an error from detect() simply means "nothing found"
+   *  rather than a real failure. */
+  private isNotFoundError(err: unknown): boolean {
+    if (err === null || typeof err !== 'object') return false;
+    const msg = 'message' in err ? String((err as Error).message).toLowerCase() : '';
+    return (
+      msg.includes('not found') ||
+      msg.includes('no multiformat readers') ||
+      msg.includes('barcode detection service unavailable') ||
+      msg.includes('invalid element or state')
+    );
   }
 
   private mapFormatToDetector(format: RawBarcode['format']): string {
