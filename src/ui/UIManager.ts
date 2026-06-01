@@ -14,8 +14,8 @@ export class UIManager {
   private readonly video: HTMLVideoElement;
   private readonly overlayCanvas: HTMLCanvasElement;
   private readonly statusEl: HTMLElement;
-  private readonly lastScanMpn: HTMLElement;
-  private readonly lastScanQty: HTMLElement;
+  private readonly lastScanMpn: HTMLInputElement;
+  private readonly lastScanQty: HTMLInputElement;
   private readonly lastScanDist: HTMLElement;
   private readonly historyBody: HTMLElement;
   private readonly scanCountEl: HTMLElement;
@@ -34,8 +34,8 @@ export class UIManager {
     this.video = document.getElementById('scanner-video') as HTMLVideoElement;
     this.overlayCanvas = document.getElementById('barcode-overlay') as HTMLCanvasElement;
     this.statusEl = document.getElementById('scanner-status') as HTMLElement;
-    this.lastScanMpn = document.getElementById('last-scan-mpn') as HTMLElement;
-    this.lastScanQty = document.getElementById('last-scan-qty') as HTMLElement;
+    this.lastScanMpn = document.getElementById('last-scan-mpn') as HTMLInputElement;
+    this.lastScanQty = document.getElementById('last-scan-qty') as HTMLInputElement;
     this.lastScanDist = document.getElementById('last-scan-dist') as HTMLElement;
     this.historyBody = document.getElementById('history-body') as HTMLElement;
     this.scanCountEl = document.getElementById('scan-count') as HTMLElement;
@@ -65,6 +65,24 @@ export class UIManager {
   private bindEvents(): void {
     this.clearBtn.addEventListener('click', () => this.clearHistory());
     this.exportBtn.addEventListener('click', () => this.exportCsv());
+
+    // Wire all "Copy" buttons in the Last Scan panel
+    document.querySelectorAll('.btn-copy').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetId = (btn as HTMLElement).dataset.target;
+        const el = targetId ? document.getElementById(targetId) : null;
+        const text = el instanceof HTMLInputElement
+          ? el.value
+          : el?.textContent ?? '';
+        if (text && text !== '—') {
+          this.copyToClipboard(text).then((ok) => {
+            if (ok) this.showToast(`Copied ${text}`, 'info');
+          });
+        } else {
+          this.showToast('Nothing to copy', 'error');
+        }
+      });
+    });
   }
 
   /** Set the camera toggle handler from the app controller. */
@@ -181,8 +199,8 @@ export class UIManager {
   }
 
   private updateLastScan(record: ScanRecord): void {
-    this.lastScanMpn.textContent = record.mpn || '—';
-    this.lastScanQty.textContent = record.quantity > 0 ? String(record.quantity) : '—';
+    this.lastScanMpn.value = record.mpn || '—';
+    this.lastScanQty.value = record.quantity > 0 ? String(record.quantity) : '—';
     this.lastScanDist.textContent = record.distributor;
   }
 
@@ -283,8 +301,8 @@ export class UIManager {
   private clearHistory(): void {
     this.scanHistory = [];
     this.historyBody.innerHTML = '';
-    this.lastScanMpn.textContent = '—';
-    this.lastScanQty.textContent = '—';
+    this.lastScanMpn.value = '—';
+    this.lastScanQty.value = '—';
     this.lastScanDist.textContent = '—';
     this.updateCount();
   }

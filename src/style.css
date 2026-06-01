@@ -239,6 +239,30 @@ button {
   word-break: break-all;
 }
 
+/* Readonly inputs — styled like .value but selectable */
+.field .value-input {
+  font-size: 1.125rem;
+  font-weight: 500;
+  font-family: "SF Mono", Monaco, monospace;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  color: inherit;
+  outline: none;
+  cursor: text;
+  /* Allow text selection */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.field .value-input:focus {
+  background: #f0f4ff;
+  outline: 1px solid #0066cc55;
+  border-radius: 2px;
+}
+
 /* Alternative MPN candidates */
 .alt-candidates {
   margin-top: 0.75rem;

@@ -79,11 +79,11 @@ export class InventoryScannerApp {
     }
 
     this.accumulateTimer = setTimeout(() => {
-      this.processAccumulated();
+      void this.processAccumulated();
     }, this.accumulateWindowMs);
   }
 
-  private processAccumulated(): void {
+  private async processAccumulated(): Promise<void> {
     const batch = this.accumulated;
     this.accumulated = [];
 
@@ -113,7 +113,7 @@ export class InventoryScannerApp {
     const accepted = this.ui.onScanDetected(best);
     if (accepted && best.mpn) {
       console.log('[Scan]', best.distributor, best.mpn, best.quantity);
-      this.ui.copyMpn(best.mpn);
+      await this.ui.copyMpn(best.mpn);
       this.ui.showAlternatives(alternatives);
     }
   }
