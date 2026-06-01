@@ -18,6 +18,15 @@ vi.mock('barcode-detector/ponyfill', () => ({
   prepareZXingModule: mocks.prepareZXingModule,
 }));
 
+vi.mock('@/scanner/ImagePreprocessor', () => ({
+  ImagePreprocessor: vi.fn(function () {
+    return {
+      processFrame: vi.fn(() => document.createElement('canvas')),
+      destroy: vi.fn(),
+    };
+  }),
+}));
+
 // Dynamically import after mocks are hoisted
 const { InventoryScannerApp } = await import('@/app');
 

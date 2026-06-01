@@ -15,11 +15,25 @@ const mocks = vi.hoisted(() => ({
   getUserMedia: vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
   }),
+  /** Mock ImagePreprocessor — returns a stub canvas so detect() receives
+   *  an HTMLCanvasElement instead of the raw video element. */
+  processFrame: vi.fn().mockReturnValue(document.createElement('canvas')),
+  preprocessorDestroy: vi.fn(),
+  ImagePreprocessor: vi.fn(function () {
+    return {
+      processFrame: mocks.processFrame,
+      destroy: mocks.preprocessorDestroy,
+    };
+  }),
 }));
 
 vi.mock('barcode-detector/ponyfill', () => ({
   BarcodeDetector: mocks.BarcodeDetector,
   prepareZXingModule: mocks.prepareZXingModule,
+}));
+
+vi.mock('@/scanner/ImagePreprocessor', () => ({
+  ImagePreprocessor: mocks.ImagePreprocessor,
 }));
 
 // Polyfill DOMRectReadOnly if jsdom lacks it
@@ -814,6 +828,105 @@ describe('BarcodeScannerEngine', () => {
       expect(cb1.onDetect).not.toHaveBeenCalled();
       expect(cb2.onDetect).not.toHaveBeenCalled(); // empty frame => no onDetect
       expect(cb2.onError).not.toHaveBeenCalled();  // and no errors either
+    });
+  });
+
+  describe('image preprocessing for faded barcodes', () => {
+    beforeEach(() => {
+      mocks.processFrame.mockReturnValue(document.createElement('canvas'));
+      mocks.ImagePreprocessor.mockClear();
+      mocks.preprocessorDestroy.mockClear();
+    });
+
+    it('creates ImagePreprocessor by default (enhanceFaded not set)', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+
+      expect(mocks.ImagePreprocessor).toHaveBeenCalledOnce();
+      expect(mocks.ImagePreprocessor).toHaveBeenCalledWith(0.02);
+    });
+
+    it('does not create preprocessor when enhanceFaded is false', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({ enhanceFaded: false }, cb);
+      await engine.start(stubVideo());
+
+      expect(mocks.ImagePreprocessor).not.toHaveBeenCalled();
+    });
+
+    it('feeds the preprocessed canvas to detect() instead of raw video', async () => {
+      const processedCanvas = document.createElement('canvas');
+      mocks.processFrame.mockReturnValue(processedCanvas);
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      const video = stubVideo();
+      await engine.start(video);
+      await rafCtrl.step();
+
+      // detect() should have received the processed canvas, not the video
+      expect(mocks.detect).toHaveBeenCalledWith(processedCanvas);
+      expect(mocks.processFrame).toHaveBeenCalledWith(video);
+    });
+
+    it('passes raw video to detect() when enhanceFaded is disabled', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({ enhanceFaded: false }, cb);
+      const video = stubVideo();
+      await engine.start(video);
+      await rafCtrl.step();
+
+      expect(mocks.detect).toHaveBeenCalledWith(video);
+      expect(mocks.processFrame).not.toHaveBeenCalled();
+    });
+
+    it('cleans up preprocessor on stop()', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+
+      expect(mocks.preprocessorDestroy).not.toHaveBeenCalled();
+
+      engine.stop();
+      expect(mocks.preprocessorDestroy).toHaveBeenCalledOnce();
+    });
+
+    it('cleans up preprocessor when start() fails', async () => {
+      mocks.getUserMedia.mockRejectedValue(new Error('Permission denied'));
+
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+
+      // start() creates preprocessor before getUserMedia,
+      // so on failure it should clean it up
+      expect(mocks.preprocessorDestroy).toHaveBeenCalledOnce();
+    });
+
+    it('creates preprocessor when enhanceFaded is explicitly true', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({ enhanceFaded: true }, cb);
+      await engine.start(stubVideo());
+
+      expect(mocks.ImagePreprocessor).toHaveBeenCalledOnce();
+    });
+
+    it('still fires onFrame when preprocessor is active', async () => {
+      mocks.detect.mockResolvedValue([
+        { rawValue: 'FADED', format: 'code_128', boundingBox: new DOMRectReadOnly(10, 20, 100, 50), cornerPoints: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] },
+      ]);
+
+      const cb = makeCallbacks();
+      cb.onFrame = vi.fn();
+      const engine = new BarcodeScannerEngine({}, cb);
+      await engine.start(stubVideo());
+      await rafCtrl.step();
+
+      expect(cb.onFrame).toHaveBeenCalled();
+      const frameArgs = (cb.onFrame as ReturnType<typeof vi.fn>).mock.calls[0][0] as RawBarcode[];
+      expect(frameArgs).toHaveLength(1);
+      expect(frameArgs[0].text).toBe('FADED');
     });
   });
 });

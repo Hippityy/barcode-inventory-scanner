@@ -1,5 +1,6 @@
 import { BarcodeDetector, prepareZXingModule, type BarcodeDetectorOptions } from 'barcode-detector/ponyfill';
 import type { RawBarcode } from '@/types/index';
+import { ImagePreprocessor } from '@/scanner/ImagePreprocessor';
 
 /** Options for the barcode scanner */
 export interface ScannerOptions {
@@ -7,6 +8,8 @@ export interface ScannerOptions {
   readonly deviceId?: string;
   /** Limit detection to specific formats (all by default) */
   readonly formats?: readonly RawBarcode['format'][];
+  /** Apply contrast enhancement + sharpening for faded barcodes (default: true) */
+  readonly enhanceFaded?: boolean;
 }
 
 /** Callbacks for scanner events */
@@ -32,6 +35,7 @@ export class BarcodeScannerEngine {
   private rafId: number | null = null;
   private videoElement: HTMLVideoElement | null = null;
   private stream: MediaStream | null = null;
+  private preprocessor: ImagePreprocessor | null = null;
 
   constructor(options: ScannerOptions, callbacks: ScannerCallbacks) {
     this.options = options;
@@ -59,6 +63,11 @@ export class BarcodeScannerEngine {
         formats: detectorFormats as unknown as BarcodeDetectorOptions['formats'],
       });
 
+      // Create image preprocessor for faded-barcode enhancement
+      if (this.options.enhanceFaded !== false) {
+        this.preprocessor = new ImagePreprocessor(0.02);
+      }
+
       // Acquire camera stream and attach it to the video element
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -81,6 +90,8 @@ export class BarcodeScannerEngine {
     } catch (err) {
       this.isRunning = false;
       this.releaseStream();
+      this.preprocessor?.destroy();
+      this.preprocessor = null;
       this.callbacks.onError(err instanceof Error ? err : new Error(String(err)));
       return false;
     }
@@ -96,6 +107,8 @@ export class BarcodeScannerEngine {
     this.releaseStream();
     this.videoElement = null;
     this.detector = null;
+    this.preprocessor?.destroy();
+    this.preprocessor = null;
   }
 
   private releaseStream(): void {
@@ -125,7 +138,9 @@ export class BarcodeScannerEngine {
     }
 
     this.detector
-      .detect(this.videoElement)
+      .detect(this.preprocessor
+        ? this.preprocessor.processFrame(this.videoElement)
+        : this.videoElement)
       .then((detected) => {
         if (!this.isRunning) return;
 
