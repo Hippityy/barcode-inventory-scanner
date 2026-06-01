@@ -21,6 +21,7 @@ export class UIManager {
   private readonly scanCountEl: HTMLElement;
   private readonly toggleInput: HTMLInputElement;
   private readonly toggleLabel: HTMLElement;
+  private readonly altCandidatesEl: HTMLElement;
   private readonly toastContainer: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
   private readonly exportBtn: HTMLButtonElement;
@@ -40,6 +41,7 @@ export class UIManager {
     this.scanCountEl = document.getElementById('scan-count') as HTMLElement;
     this.toggleInput = document.getElementById('camera-toggle') as HTMLInputElement;
     this.toggleLabel = document.querySelector('.toggle-label') as HTMLElement;
+    this.altCandidatesEl = document.getElementById('alt-candidates') as HTMLElement;
     this.toastContainer = document.getElementById('toast-container') as HTMLElement;
     this.clearBtn = document.getElementById('btn-clear') as HTMLButtonElement;
     this.exportBtn = document.getElementById('btn-export') as HTMLButtonElement;
@@ -182,6 +184,46 @@ export class UIManager {
     this.lastScanMpn.textContent = record.mpn || '—';
     this.lastScanQty.textContent = record.quantity > 0 ? String(record.quantity) : '—';
     this.lastScanDist.textContent = record.distributor;
+  }
+
+  /** Show alternative MPN candidates below the main Last Scan result */
+  showAlternatives(alternatives: readonly { mpn: string; distributor: string }[]): void {
+    // Clear previous
+    this.altCandidatesEl.querySelectorAll('.alt-row').forEach((r) => r.remove());
+
+    if (alternatives.length === 0) {
+      this.altCandidatesEl.style.display = 'none';
+      return;
+    }
+
+    this.altCandidatesEl.style.display = 'block';
+
+    for (const alt of alternatives) {
+      const row = document.createElement('div');
+      row.className = 'alt-row';
+
+      const mpnSpan = document.createElement('span');
+      mpnSpan.className = 'alt-mpn';
+      mpnSpan.textContent = alt.mpn;
+
+      const distSpan = document.createElement('span');
+      distSpan.className = 'alt-dist';
+      distSpan.textContent = alt.distributor !== 'unknown' ? alt.distributor : '';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'alt-copy-btn';
+      copyBtn.textContent = 'Copy';
+      copyBtn.addEventListener('click', async () => {
+        if (await this.copyToClipboard(alt.mpn)) {
+          this.showToast(`Copied ${alt.mpn}`, 'info');
+        }
+      });
+
+      row.appendChild(mpnSpan);
+      row.appendChild(distSpan);
+      row.appendChild(copyBtn);
+      this.altCandidatesEl.appendChild(row);
+    }
   }
 
   private addHistoryRow(record: ScanRecord): void {

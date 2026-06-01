@@ -239,6 +239,55 @@ button {
   word-break: break-all;
 }
 
+/* Alternative MPN candidates */
+.alt-candidates {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e4e6eb;
+}
+
+.alt-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+}
+
+.alt-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.alt-mpn {
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 0.8125rem;
+  color: #333;
+  flex: 1;
+}
+
+.alt-dist {
+  font-size: 0.6875rem;
+  color: #888;
+}
+
+.alt-copy-btn {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+  background: #f0f1f5;
+  border: none;
+  border-radius: 3px;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.alt-copy-btn:hover {
+  background: #e4e6eb;
+}
+
 /* History */
 .history {
   background: #fff;

@@ -46,6 +46,7 @@ function setupDom(): void {
         <span id="last-scan-mpn" class="value">—</span>
         <span id="last-scan-qty" class="value">—</span>
         <span id="last-scan-dist" class="value">—</span>
+        <div id="alt-candidates" class="alt-candidates" style="display:none"></div>
       </section>
       <section class="history">
         <span id="scan-count" class="badge">0</span>

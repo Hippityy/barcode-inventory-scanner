@@ -47,6 +47,12 @@ export class Element14Parser implements BarcodeParser {
       return null;
     }
 
+    // Reject known Mouser order-code patterns (e.g. 710-1234567)
+    // so Element14 doesn't claim them as MPNs
+    if (/^\d{3}-[A-Z0-9]+$/i.test(stripped)) {
+      return null;
+    }
+
     // 6-8 digit numeric → Element14 order code
     if (/^\d{6,8}$/.test(stripped)) {
       return {

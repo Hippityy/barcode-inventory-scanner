@@ -96,10 +96,25 @@ export class InventoryScannerApp {
       return;
     }
 
+    // Collect all unique MPN candidates (including rejected ones) from the batch
+    const seen = new Set<string>();
+    const alternatives: { mpn: string; distributor: string }[] = [];
+    for (const parser of this.parsers) {
+      for (const raw of batch) {
+        if (!parser.canParse(raw)) continue;
+        const result = parser.parse(raw);
+        if (result?.mpn && !seen.has(result.mpn) && result.mpn !== best.mpn) {
+          seen.add(result.mpn);
+          alternatives.push({ mpn: result.mpn, distributor: result.distributor });
+        }
+      }
+    }
+
     const accepted = this.ui.onScanDetected(best);
     if (accepted && best.mpn) {
       console.log('[Scan]', best.distributor, best.mpn, best.quantity);
       this.ui.copyMpn(best.mpn);
+      this.ui.showAlternatives(alternatives);
     }
   }
 

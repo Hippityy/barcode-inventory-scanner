@@ -86,6 +86,14 @@ describe('looksLikeMpn', () => {
     expect(looksLikeMpn('RC0603FR-0710KL')).toBe(true);
   });
 
+  it('returns true for Molex-style hyphenated numeric MPN', () => {
+    expect(looksLikeMpn('43045-0612')).toBe(true);
+  });
+
+  it('returns true for TE-style multi-hyphen numeric MPN', () => {
+    expect(looksLikeMpn('1-480700-0')).toBe(true);
+  });
+
   it('returns false for pure numeric short string', () => {
     expect(looksLikeMpn('123')).toBe(false);
   });

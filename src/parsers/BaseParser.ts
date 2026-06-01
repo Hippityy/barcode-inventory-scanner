@@ -34,17 +34,27 @@ const NON_MPN_TOKENS = new Set([
 
 /** Check if a string looks like a manufacturer part number.
  *
- *  Real MPNs always contain at least one digit (e.g. LM358N, BAT54C).
- *  Purely-alphabetic strings are almost certainly label metadata
- *  (customer PO, country of origin, etc.) — not part numbers. */
+ *  Real MPNs have at least one digit.  Purely-alphabetic strings are
+ *  almost certainly label metadata (customer PO, country of origin, etc.)
+ *  — not part numbers.
+ *
+ *  Hyphen-separated numeric groups (e.g. Molex 43045-0612, TE 1-480700-0)
+ *  are also accepted — the digit-hyphen-digit pattern is a strong signal
+ *  of a component part number. */
 export function looksLikeMpn(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.length < 2) {
     return false;
   }
   const hasLetter = /[A-Za-z]/.test(trimmed);
+  const hasDigit = /\d/.test(trimmed);
   const onlyDigitsAndLettersAndSymbols = /^[A-Za-z0-9\-_.\/]+$/.test(trimmed);
-  if (!onlyDigitsAndLettersAndSymbols || !hasLetter) {
+  if (!onlyDigitsAndLettersAndSymbols || !hasDigit) {
+    return false;
+  }
+
+  // Accept: letters+digits (classic MPN) OR hyphen+digits (Molex/TE-style)
+  if (!hasLetter && !/-/.test(trimmed)) {
     return false;
   }
 
