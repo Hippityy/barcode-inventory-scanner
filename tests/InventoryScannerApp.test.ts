@@ -160,6 +160,19 @@ describe('InventoryScannerApp (integration)', () => {
       const video = getVideo();
       expect(video.srcObject).not.toBeNull();
       expect(video.srcObject).toBeDefined();
+
+      // Verify play() was called — without it the video would never
+      // render frames and the scan loop would spin on readyState 0.
+      expect(video.play).toHaveBeenCalled();
+
+      // Verify getUserMedia was called with rear-facing camera constraint
+      expect(mocks.getUserMedia).toHaveBeenCalledWith({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
     });
 
     it('clears the video srcObject on stop', async () => {
