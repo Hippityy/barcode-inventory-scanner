@@ -147,8 +147,13 @@ export class UIManager {
     }
   }
 
-  /** Show a transient toast notification (bottom-right). */
-  showToast(message: string, type: 'error' | 'info' = 'info'): void {
+  /** Show a transient toast notification (bottom-right).
+   *  @param durationMs Auto-dismiss after this many ms. Default 2000 for info, 6000 for errors. */
+  showToast(
+    message: string,
+    type: 'error' | 'info' = 'info',
+    durationMs?: number,
+  ): void {
     const toast = document.createElement('div');
     toast.className = `toast toast--${type}`;
     toast.textContent = message;
@@ -162,8 +167,9 @@ export class UIManager {
     };
     toast.addEventListener('click', dismiss);
 
-    // Auto-dismiss after 6 s
-    const timer = setTimeout(dismiss, 6000);
+    // Auto-dismiss — default 2 s for info, 6 s for errors
+    const ms = durationMs ?? (type === 'error' ? 6000 : 2000);
+    const timer = setTimeout(dismiss, ms);
 
     // Clean up timer if dismissed early
     toast.addEventListener('animationend', () => clearTimeout(timer), { once: true });
