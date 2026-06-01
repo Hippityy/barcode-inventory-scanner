@@ -28,16 +28,18 @@ export class BarcodeScannerEngine {
   private isRunning = false;
   private rafId: number | null = null;
   private videoElement: HTMLVideoElement | null = null;
+  private stream: MediaStream | null = null;
 
   constructor(options: ScannerOptions, callbacks: ScannerCallbacks) {
     this.options = options;
     this.callbacks = callbacks;
   }
 
-  /** Start scanning from the specified video element. */
-  async start(videoElement: HTMLVideoElement): Promise<void> {
+  /** Start scanning from the specified video element.
+   *  Returns `true` if scanning started successfully, `false` otherwise. */
+  async start(videoElement: HTMLVideoElement): Promise<boolean> {
     if (this.isRunning) {
-      return;
+      return true;
     }
     this.isRunning = true;
     this.videoElement = videoElement;
@@ -54,11 +56,30 @@ export class BarcodeScannerEngine {
         formats: detectorFormats as unknown as BarcodeDetectorOptions['formats'],
       });
 
+      // Acquire camera stream and attach it to the video element
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+      this.videoElement.srcObject = this.stream;
+
+      // Explicitly play() — `autoplay` alone may not trigger when
+      // srcObject is set programmatically. The scanLoop already
+      // guards against unready frames (readyState < 2 check), so
+      // we don't block on loadeddata here.
+      await this.videoElement.play();
+
       this.rafId = requestAnimationFrame(() => this.scanLoop());
       this.callbacks.onReady?.();
+      return true;
     } catch (err) {
       this.isRunning = false;
+      this.releaseStream();
       this.callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      return false;
     }
   }
 
@@ -69,8 +90,19 @@ export class BarcodeScannerEngine {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+    this.releaseStream();
     this.videoElement = null;
     this.detector = null;
+  }
+
+  private releaseStream(): void {
+    if (this.stream) {
+      this.stream.getTracks().forEach((track) => track.stop());
+      this.stream = null;
+    }
+    if (this.videoElement) {
+      this.videoElement.srcObject = null;
+    }
   }
 
   private scanLoop(): void {

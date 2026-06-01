@@ -50,7 +50,11 @@ export class InventoryScannerApp {
       }
     );
 
-    await this.scanner.start(this.ui.getVideoElement());
+    const ok = await this.scanner.start(this.ui.getVideoElement());
+    if (!ok) {
+      this.scanner = null;
+      return;
+    }
     this.isRunning = true;
   }
 
@@ -100,5 +104,6 @@ export class InventoryScannerApp {
   private onError(error: Error): void {
     console.error('Scanner error:', error);
     this.ui.setStatus(`Error: ${error.message}`);
+    this.ui.showToast(error.message, 'error');
   }
 }

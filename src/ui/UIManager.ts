@@ -18,7 +18,9 @@ export class UIManager {
   private readonly lastScanDist: HTMLElement;
   private readonly historyBody: HTMLElement;
   private readonly scanCountEl: HTMLElement;
-  private readonly toggleBtn: HTMLButtonElement;
+  private readonly toggleInput: HTMLInputElement;
+  private readonly toggleLabel: HTMLElement;
+  private readonly toastContainer: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
   private readonly exportBtn: HTMLButtonElement;
   private audioCtx: AudioContext | null = null;
@@ -34,7 +36,9 @@ export class UIManager {
     this.lastScanDist = document.getElementById('last-scan-dist') as HTMLElement;
     this.historyBody = document.getElementById('history-body') as HTMLElement;
     this.scanCountEl = document.getElementById('scan-count') as HTMLElement;
-    this.toggleBtn = document.getElementById('btn-toggle') as HTMLButtonElement;
+    this.toggleInput = document.getElementById('camera-toggle') as HTMLInputElement;
+    this.toggleLabel = document.querySelector('.toggle-label') as HTMLElement;
+    this.toastContainer = document.getElementById('toast-container') as HTMLElement;
     this.clearBtn = document.getElementById('btn-clear') as HTMLButtonElement;
     this.exportBtn = document.getElementById('btn-export') as HTMLButtonElement;
 
@@ -61,19 +65,42 @@ export class UIManager {
 
   /** Set the camera toggle handler from the app controller. */
   setToggleHandler(handler: () => void): void {
-    this.toggleBtn.addEventListener('click', handler);
+    this.toggleInput.addEventListener('change', handler);
   }
 
-  /** Update the toggle button to reflect camera state. */
+  /** Update the toggle to reflect camera state. */
   setCameraActive(active: boolean): void {
-    this.toggleBtn.textContent = active ? 'Stop Camera' : 'Start Camera';
-    this.toggleBtn.classList.toggle('btn-primary', !active);
-    this.toggleBtn.classList.toggle('btn-danger', active);
+    this.toggleInput.checked = active;
+    this.toggleLabel.textContent = active ? 'Camera On' : 'Camera Off';
   }
 
   /** Update scanner status text. */
   setStatus(status: string): void {
     this.statusEl.textContent = status;
+  }
+
+  /** Show a transient toast notification (bottom-right). */
+  showToast(message: string, type: 'error' | 'info' = 'info'): void {
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    toast.textContent = message;
+
+    // Click dismisses early
+    const dismiss = () => {
+      if (toast.parentNode) {
+        toast.classList.add('toast--exiting');
+        toast.addEventListener('animationend', () => toast.remove());
+      }
+    };
+    toast.addEventListener('click', dismiss);
+
+    // Auto-dismiss after 6 s
+    const timer = setTimeout(dismiss, 6000);
+
+    // Clean up timer if dismissed early
+    toast.addEventListener('animationend', () => clearTimeout(timer), { once: true });
+
+    this.toastContainer.appendChild(toast);
   }
 
   /** Called when a new component is detected. Returns true if accepted, false if debounced. */

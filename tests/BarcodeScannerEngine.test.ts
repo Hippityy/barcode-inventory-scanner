@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   BarcodeDetector: vi.fn(function () {
     return { detect: mocks.detect };
   }),
+  getUserMedia: vi.fn().mockResolvedValue({
+    getTracks: () => [{ stop: vi.fn() }],
+  }),
 }));
 
 vi.mock('barcode-detector/ponyfill', () => ({
@@ -63,6 +66,8 @@ function makeCallbacks(): ScannerCallbacks {
  *  the readiness guard. */
 function stubVideo(ready = true): HTMLVideoElement {
   const v = document.createElement('video');
+  // play() is called by start() after setting srcObject
+  v.play = vi.fn().mockResolvedValue(undefined);
   if (ready) {
     Object.defineProperty(v, 'readyState', { value: 2, writable: true });
     Object.defineProperty(v, 'videoWidth', { value: 640, writable: true });
@@ -130,6 +135,21 @@ describe('BarcodeScannerEngine', () => {
     vi.clearAllMocks();
     mocks.prepareZXingModule.mockResolvedValue(undefined);
     mocks.detect.mockResolvedValue([]);
+    mocks.getUserMedia.mockResolvedValue({
+      getTracks: () => [{ stop: vi.fn() }],
+    });
+
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        ...(globalThis.navigator || {}),
+        mediaDevices: {
+          ...(globalThis.navigator?.mediaDevices || {}),
+          getUserMedia: mocks.getUserMedia,
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
 
     rafCtrl = new RafController();
     rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(rafCtrl.request);
@@ -164,6 +184,33 @@ describe('BarcodeScannerEngine', () => {
       await engine.start(stubVideo());
       expect(cb.onReady).not.toHaveBeenCalled();
       expect(cb.onError).toHaveBeenCalledOnce();
+    });
+
+    it('returns true on successful start', async () => {
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      const result = await engine.start(stubVideo());
+      expect(result).toBe(true);
+    });
+
+    it('returns false and calls onError when getUserMedia fails', async () => {
+      mocks.getUserMedia.mockRejectedValue(new Error('Permission denied'));
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      const result = await engine.start(stubVideo());
+      expect(result).toBe(false);
+      expect(cb.onError).toHaveBeenCalledOnce();
+      expect(cb.onError).toHaveBeenCalledWith(new Error('Permission denied'));
+    });
+
+    it('returns false and wraps non-Error when getUserMedia rejects with a string', async () => {
+      mocks.getUserMedia.mockRejectedValue('Not allowed');
+      const cb = makeCallbacks();
+      const engine = new BarcodeScannerEngine({}, cb);
+      const result = await engine.start(stubVideo());
+      expect(result).toBe(false);
+      expect(cb.onError).toHaveBeenCalledOnce();
+      expect(cb.onError).toHaveBeenCalledWith(new Error('Not allowed'));
     });
 
     it('fires onReady only once per start', async () => {

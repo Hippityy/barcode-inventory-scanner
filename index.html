@@ -21,7 +21,11 @@
         </div>
       </div>
       <div class="controls">
-        <button id="btn-toggle" class="btn-primary">Start Camera</button>
+        <label class="toggle-switch">
+          <input type="checkbox" id="camera-toggle">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Camera Off</span>
+        </label>
       </div>
       <p id="scanner-status" class="status">Camera inactive</p>
     </section>
@@ -69,6 +73,8 @@
       </div>
     </section>
   </div>
+
+  <div id="toast-container" class="toast-container"></div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>
