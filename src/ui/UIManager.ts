@@ -191,10 +191,13 @@ export class UIManager {
     this.toastContainer.appendChild(toast);
   }
 
-  /** Called when a new component is detected. Returns true if accepted, false if debounced. */
-  onScanDetected(component: ParsedComponent): boolean {
+  /** Called when a new component is detected. Returns true if accepted, false if debounced/duplicate.
+   *  @param batch The raw barcodes that produced this scan (used for context in rejection toasts). */
+  onScanDetected(component: ParsedComponent, batch?: readonly RawBarcode[]): boolean {
     const now = Date.now();
     if (now - this.lastScanTime < this.debounceMs) {
+      const label = component.mpn || batch?.[0]?.text || 'barcode';
+      this.showToast(`Too fast — ${label} skipped (${this.debounceMs}ms cooldown)`, 'info');
       return false;
     }
 
@@ -205,6 +208,7 @@ export class UIManager {
 
     if (isDuplicate) {
       this.playTone(300, 0.1, 'square');
+      this.showToast(`Duplicate: ${component.mpn} × ${component.quantity || '?'}`, 'info');
       return false;
     }
 

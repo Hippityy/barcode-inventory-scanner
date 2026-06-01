@@ -93,6 +93,12 @@ export class InventoryScannerApp {
 
     const best = filterMultipleBarcodes(batch, this.parsers);
     if (best === null) {
+      // Show the raw barcode text so you know what was seen but rejected
+      const samples = [...new Set(batch.map((b) => b.text))].slice(0, 3);
+      this.ui.showToast(
+        `No MPN matched: ${samples.join(', ')}`,
+        'info',
+      );
       return;
     }
 
@@ -110,7 +116,7 @@ export class InventoryScannerApp {
       }
     }
 
-    const accepted = this.ui.onScanDetected(best);
+    const accepted = this.ui.onScanDetected(best, batch);
     if (accepted && best.mpn) {
       console.log('[Scan]', best.distributor, best.mpn, best.quantity);
       await this.ui.copyMpn(best.mpn);
