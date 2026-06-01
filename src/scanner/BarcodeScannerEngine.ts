@@ -14,6 +14,9 @@ export interface ScannerCallbacks {
   onDetect: (barcodes: RawBarcode[]) => void;
   onError: (error: Error) => void;
   onReady?: () => void;
+  /** Fired every frame with all barcodes found (or empty array).
+   *  Used to draw bounding-box overlays on the video preview. */
+  onFrame?: (barcodes: RawBarcode[]) => void;
 }
 
 /** Wrapper around the Barcode Detection API (via barcode-detector ponyfill).
@@ -126,14 +129,17 @@ export class BarcodeScannerEngine {
       .then((detected) => {
         if (!this.isRunning) return;
 
-        if (detected.length > 0) {
-          const barcodes: RawBarcode[] = detected.map((d) => ({
-            text: d.rawValue,
-            format: this.mapFormatFromDetector(d.format),
-            boundingBox: d.boundingBox,
-            cornerPoints: d.cornerPoints,
-          }));
+        const barcodes: RawBarcode[] = detected.map((d) => ({
+          text: d.rawValue,
+          format: this.mapFormatFromDetector(d.format),
+          boundingBox: d.boundingBox,
+          cornerPoints: d.cornerPoints,
+        }));
 
+        // Fire frame callback even when empty — so the overlay can clear
+        this.callbacks.onFrame?.(barcodes);
+
+        if (barcodes.length > 0) {
           this.callbacks.onDetect(barcodes);
         }
 
@@ -147,6 +153,8 @@ export class BarcodeScannerEngine {
         // ZXing throws when no barcode is found in a frame — ignore it
         // and keep scanning.  The ponyfill may wrap it in a DOMException.
         if (this.isNotFoundError(err)) {
+          // Clear the overlay — no barcodes in this frame
+          this.callbacks.onFrame?.([]);
           this.rafId = requestAnimationFrame(() => this.scanLoop());
           return;
         }

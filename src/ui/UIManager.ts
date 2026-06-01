@@ -1,4 +1,4 @@
-import type { ScanRecord, ParsedComponent } from '@/types/index';
+import type { ScanRecord, ParsedComponent, RawBarcode } from '@/types/index';
 
 /** Generates a short unique ID */
 function makeId(): string {
@@ -12,6 +12,7 @@ function makeId(): string {
  */
 export class UIManager {
   private readonly video: HTMLVideoElement;
+  private readonly overlayCanvas: HTMLCanvasElement;
   private readonly statusEl: HTMLElement;
   private readonly lastScanMpn: HTMLElement;
   private readonly lastScanQty: HTMLElement;
@@ -30,6 +31,7 @@ export class UIManager {
 
   constructor() {
     this.video = document.getElementById('scanner-video') as HTMLVideoElement;
+    this.overlayCanvas = document.getElementById('barcode-overlay') as HTMLCanvasElement;
     this.statusEl = document.getElementById('scanner-status') as HTMLElement;
     this.lastScanMpn = document.getElementById('last-scan-mpn') as HTMLElement;
     this.lastScanQty = document.getElementById('last-scan-qty') as HTMLElement;
@@ -77,6 +79,43 @@ export class UIManager {
   /** Update scanner status text. */
   setStatus(status: string): void {
     this.statusEl.textContent = status;
+  }
+
+  /** Draw bounding-box rectangles on the canvas overlay for each detected
+   *  barcode.  Pass an empty array to clear. */
+  drawFrame(barcodes: readonly RawBarcode[]): void {
+    const canvas = this.overlayCanvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const vw = this.video.videoWidth;
+    const vh = this.video.videoHeight;
+    if (vw === 0 || vh === 0) return;
+
+    // Match canvas pixel dimensions to the video's intrinsic resolution
+    // so bounding-box coords map 1:1.  CSS object-fit:cover scales it visually.
+    if (canvas.width !== vw || canvas.height !== vh) {
+      canvas.width = vw;
+      canvas.height = vh;
+    }
+
+    ctx.clearRect(0, 0, vw, vh);
+
+    for (const bc of barcodes) {
+      const box = bc.boundingBox;
+      if (!box) continue;
+
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = Math.max(2, vw * 0.002);
+      ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+      // Small label showing the barcode text
+      ctx.fillStyle = '#00ff88';
+      ctx.font = `${Math.max(11, vh * 0.022)}px monospace`;
+      const label = bc.text.length > 24 ? bc.text.slice(0, 22) + '…' : bc.text;
+      const textY = box.y > 20 ? box.y - 4 : box.y + box.height + 14;
+      ctx.fillText(label, box.x, textY);
+    }
   }
 
   /** Show a transient toast notification (bottom-right). */

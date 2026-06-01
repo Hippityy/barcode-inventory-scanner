@@ -47,6 +47,7 @@ export class InventoryScannerApp {
         onDetect: (barcodes) => this.onDetect(barcodes),
         onError: (err) => this.onError(err),
         onReady: () => this.ui.setStatus('Camera active — show barcode'),
+        onFrame: (barcodes) => this.ui.drawFrame(barcodes),
       }
     );
 
