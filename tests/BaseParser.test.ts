@@ -54,8 +54,24 @@ describe('looksLikeMpn', () => {
     expect(looksLikeMpn('A')).toBe(false);
   });
 
-  it('returns true for two letters', () => {
-    expect(looksLikeMpn('AB')).toBe(true);
+  it('returns false for letters-only string (no digits)', () => {
+    expect(looksLikeMpn('AB')).toBe(false);
+  });
+
+  it('returns false for known non-MPN label metadata', () => {
+    expect(looksLikeMpn('CUSTPO')).toBe(false);
+    expect(looksLikeMpn('INVOICE')).toBe(false);
+    expect(looksLikeMpn('COUNTRY')).toBe(false);
+  });
+
+  it('returns false for blacklisted prefix followed by number', () => {
+    expect(looksLikeMpn('PO12345')).toBe(false);
+    expect(looksLikeMpn('INV67890')).toBe(false);
+  });
+
+  it('does not reject strings that merely start with blacklisted prefix', () => {
+    // "POWER01" starts with "PO" but is a legitimate MPN pattern
+    expect(looksLikeMpn('POWER01')).toBe(true);
   });
 
   it('returns true for typical MPN with letters and digits', () => {

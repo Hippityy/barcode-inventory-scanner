@@ -19,7 +19,24 @@ export function extractQuantity(qtyStr: string): number | null {
   return parsed;
 }
 
-/** Check if a string looks like a manufacturer part number */
+/** Words/prefixes that appear on distributor labels but are never MPNs */
+const NON_MPN_TOKENS = new Set([
+  'CUST', 'CUSTPO', 'CUSTOMER', 'PO', 'PURCHASE',
+  'INVOICE', 'INV', 'COUNTRY', 'ORIGIN', 'MADEIN',
+  'LOT', 'BATCH', 'DATE', 'D/C', 'DC', 'MFG',
+  'VENDOR', 'SUPPLIER', 'QTY', 'QUANTITY', 'PCS',
+  'EACH', 'PKG', 'PACKAGE', 'DESC', 'DESCRIPTION',
+  'VALUE', 'TYPE', 'ROHS', 'LEADFREE', 'HALOGENFREE',
+  'MSL', 'MSL3', 'PB-FREE', 'PBFREE',
+  'ASSEMBLED', 'COO', 'ECCN', 'HTS', 'HTSUS',
+  'TARIC', 'TARIFF', 'DISTRIBUTOR', 'SELLER',
+]);
+
+/** Check if a string looks like a manufacturer part number.
+ *
+ *  Real MPNs always contain at least one digit (e.g. LM358N, BAT54C).
+ *  Purely-alphabetic strings are almost certainly label metadata
+ *  (customer PO, country of origin, etc.) — not part numbers. */
 export function looksLikeMpn(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.length < 2) {
@@ -27,8 +44,34 @@ export function looksLikeMpn(text: string): boolean {
   }
   const hasLetter = /[A-Za-z]/.test(trimmed);
   const onlyDigitsAndLettersAndSymbols = /^[A-Za-z0-9\-_.\/]+$/.test(trimmed);
-  // Must contain at least one letter (true MPNs are never pure numeric)
-  return onlyDigitsAndLettersAndSymbols && hasLetter;
+  if (!onlyDigitsAndLettersAndSymbols || !hasLetter) {
+    return false;
+  }
+
+  // Reject known non-MPN label metadata
+  const upper = trimmed.toUpperCase();
+  if (NON_MPN_TOKENS.has(upper)) {
+    return false;
+  }
+  // Also reject if it starts with a blacklisted prefix followed
+  // by ONLY digits (e.g. "PO12345", "INV67890").  We require the
+  // remainder to be pure digits so strings like "POWER01" (a real
+  // MPN that coincidentally starts with "PO") are not rejected.
+  for (const token of NON_MPN_TOKENS) {
+    if (upper.startsWith(token)) {
+      const rest = upper.slice(token.length);
+      if (rest.length > 0 && /^\d+$/.test(rest)) {
+        return false;
+      }
+    }
+  }
+
+  // Real MPNs always contain at least one digit
+  if (!/\d/.test(trimmed)) {
+    return false;
+  }
+
+  return true;
 }
 
 /** Known ECIA data identifiers, longest first to avoid partial matches */

@@ -96,8 +96,9 @@ export class InventoryScannerApp {
     }
 
     const accepted = this.ui.onScanDetected(best);
-    if (accepted) {
+    if (accepted && best.mpn) {
       console.log('[Scan]', best.distributor, best.mpn, best.quantity);
+      this.ui.copyMpn(best.mpn);
     }
   }
 

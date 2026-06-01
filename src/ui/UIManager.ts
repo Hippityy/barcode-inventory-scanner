@@ -161,15 +161,15 @@ export class UIManager {
     const actionsCell = document.createElement('td');
     const copyMpnBtn = document.createElement('button');
     copyMpnBtn.textContent = 'Copy MPN';
-    copyMpnBtn.addEventListener('click', () => this.copyToClipboard(record.mpn));
+    copyMpnBtn.addEventListener('click', () => this.copyToClipboard(record.mpn, `MPN ${record.mpn}`));
 
     const copyQtyBtn = document.createElement('button');
     copyQtyBtn.textContent = 'Copy Qty';
-    copyQtyBtn.addEventListener('click', () => this.copyToClipboard(String(record.quantity)));
+    copyQtyBtn.addEventListener('click', () => this.copyToClipboard(String(record.quantity), `Qty ${record.quantity}`));
 
     const copyRowBtn = document.createElement('button');
     copyRowBtn.textContent = 'Copy Row';
-    copyRowBtn.addEventListener('click', () => this.copyToClipboard(`${record.mpn}\t${record.quantity}`));
+    copyRowBtn.addEventListener('click', () => this.copyToClipboard(`${record.mpn}\t${record.quantity}`, `row`));
 
     actionsCell.appendChild(copyMpnBtn);
     actionsCell.appendChild(copyQtyBtn);
@@ -196,7 +196,7 @@ export class UIManager {
     this.updateCount();
   }
 
-  private async copyToClipboard(text: string): Promise<void> {
+  private async copyToClipboard(text: string, label: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -210,6 +210,12 @@ export class UIManager {
       document.execCommand('copy');
       document.body.removeChild(textarea);
     }
+    this.showToast(`Copied ${label}`, 'info');
+  }
+
+  /** Copy MPN to clipboard and show feedback toast */
+  copyMpn(mpn: string): void {
+    this.copyToClipboard(mpn, `MPN ${mpn}`);
   }
 
   private exportCsv(): void {

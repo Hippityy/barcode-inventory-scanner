@@ -81,12 +81,12 @@ export class Element14Parser implements BarcodeParser {
       };
     }
 
-    // Long numeric could be MPN from distributors like Würth
+    // Long numeric could be MPN from distributors like Würth/Molex
     if (mightBeNumericMpn(stripped)) {
       return {
         mpn: stripped,
         quantity: null,
-        distributor: 'element14',
+        distributor: 'unknown',
         raw: raw.text,
         confidence: 'low',
       };

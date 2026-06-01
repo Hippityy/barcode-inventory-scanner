@@ -81,6 +81,7 @@ describe('Element14Parser.parse', () => {
     expect(result).not.toBeNull();
     expect(result!.mpn).toBe('123456789');
     expect(result!.quantity).toBeNull();
+    expect(result!.distributor).toBe('unknown');
     expect(result!.confidence).toBe('low');
   });
 
@@ -98,6 +99,7 @@ describe('Element14Parser.parse', () => {
     expect(result).not.toBeNull();
     expect(result!.mpn).toBe('61300511121');
     expect(result!.quantity).toBeNull();
+    expect(result!.distributor).toBe('unknown');
     expect(result!.confidence).toBe('low');
   });
 
