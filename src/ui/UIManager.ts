@@ -46,6 +46,15 @@ export class UIManager {
     this.clearBtn = document.getElementById('btn-clear') as HTMLButtonElement;
     this.exportBtn = document.getElementById('btn-export') as HTMLButtonElement;
 
+    // Wire git watermark — shows short commit hash, links to GitHub
+    const wm = document.getElementById('watermark') as HTMLAnchorElement | null;
+    if (wm) {
+      wm.href =
+        (typeof __GIT_COMMIT_URL__ !== 'undefined' && __GIT_COMMIT_URL__) || '#';
+      wm.textContent =
+        (typeof __GIT_SHORT_HASH__ !== 'undefined' && __GIT_SHORT_HASH__) || 'dev';
+    }
+
     // Audio context for beep feedback
     try {
       this.audioCtx = new AudioContext();

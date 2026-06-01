@@ -444,3 +444,22 @@ td button {
     gap: 0.5rem;
   }
 }
+
+/* Git commit watermark — bottom-right, subtle grey, clickable */
+.watermark {
+  position: fixed;
+  bottom: 0.375rem;
+  right: 0.5rem;
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 0.625rem;
+  color: #b0b0b0;
+  text-decoration: none;
+  z-index: 9998;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.watermark:hover {
+  opacity: 1;
+  color: #888;
+}
