@@ -162,7 +162,13 @@ export class UIManager {
     const dismiss = () => {
       if (toast.parentNode) {
         toast.classList.add('toast--exiting');
-        toast.addEventListener('animationend', () => toast.remove());
+        const onOut = (e: AnimationEvent) => {
+          if (e.animationName === 'toast-out') {
+            toast.removeEventListener('animationend', onOut);
+            toast.remove();
+          }
+        };
+        toast.addEventListener('animationend', onOut);
       }
     };
     toast.addEventListener('click', dismiss);
@@ -171,8 +177,16 @@ export class UIManager {
     const ms = durationMs ?? (type === 'error' ? 6000 : 2000);
     const timer = setTimeout(dismiss, ms);
 
-    // Clean up timer if dismissed early
-    toast.addEventListener('animationend', () => clearTimeout(timer), { once: true });
+    // Clean up timer if dismissed early (only on toast-out animation,
+    // not toast-in — otherwise { once: true } fires on entry and kills
+    // the timer before it ever runs).
+    const cleanup = (e: AnimationEvent) => {
+      if (e.animationName === 'toast-out') {
+        clearTimeout(timer);
+        toast.removeEventListener('animationend', cleanup);
+      }
+    };
+    toast.addEventListener('animationend', cleanup);
 
     this.toastContainer.appendChild(toast);
   }
