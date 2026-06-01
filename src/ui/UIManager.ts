@@ -364,11 +364,15 @@ export class UIManager {
     }
   }
 
-  /** Copy MPN to clipboard and show feedback toast (called on scan auto-copy) */
+  /** Copy MPN to clipboard and show feedback toast (called on scan auto-copy).
+   *  Auto-copy runs without a user gesture, so the Clipboard API may reject.
+   *  When that happens we show a nudge to use the Copy button instead. */
   async copyMpn(mpn: string): Promise<void> {
     const ok = await this.copyToClipboard(mpn);
     if (ok) {
       this.showToast(`Copied MPN ${mpn}`, 'info');
+    } else {
+      this.showToast(`${mpn} — tap Copy to save`, 'info', 3000);
     }
   }
 
