@@ -18,11 +18,10 @@ export class UIManager {
   private readonly lastScanDist: HTMLElement;
   private readonly historyBody: HTMLElement;
   private readonly scanCountEl: HTMLElement;
-  private readonly startBtn: HTMLButtonElement;
-  private readonly stopBtn: HTMLButtonElement;
+  private readonly toggleBtn: HTMLButtonElement;
   private readonly clearBtn: HTMLButtonElement;
   private readonly exportBtn: HTMLButtonElement;
-  private readonly audioCtx: AudioContext | null = null;
+  private audioCtx: AudioContext | null = null;
   private scanHistory: ScanRecord[] = [];
   private lastScanTime = 0;
   private readonly debounceMs = 1500;
@@ -35,8 +34,7 @@ export class UIManager {
     this.lastScanDist = document.getElementById('last-scan-dist') as HTMLElement;
     this.historyBody = document.getElementById('history-body') as HTMLElement;
     this.scanCountEl = document.getElementById('scan-count') as HTMLElement;
-    this.startBtn = document.getElementById('btn-start') as HTMLButtonElement;
-    this.stopBtn = document.getElementById('btn-stop') as HTMLButtonElement;
+    this.toggleBtn = document.getElementById('btn-toggle') as HTMLButtonElement;
     this.clearBtn = document.getElementById('btn-clear') as HTMLButtonElement;
     this.exportBtn = document.getElementById('btn-export') as HTMLButtonElement;
 
@@ -61,13 +59,16 @@ export class UIManager {
     this.exportBtn.addEventListener('click', () => this.exportCsv());
   }
 
-  /** Set start/stop button handlers from the app controller. */
-  setStartHandler(handler: () => void): void {
-    this.startBtn.addEventListener('click', handler);
+  /** Set the camera toggle handler from the app controller. */
+  setToggleHandler(handler: () => void): void {
+    this.toggleBtn.addEventListener('click', handler);
   }
 
-  setStopHandler(handler: () => void): void {
-    this.stopBtn.addEventListener('click', handler);
+  /** Update the toggle button to reflect camera state. */
+  setCameraActive(active: boolean): void {
+    this.toggleBtn.textContent = active ? 'Stop Camera' : 'Start Camera';
+    this.toggleBtn.classList.toggle('btn-primary', !active);
+    this.toggleBtn.classList.toggle('btn-danger', active);
   }
 
   /** Update scanner status text. */

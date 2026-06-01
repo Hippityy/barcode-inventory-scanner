@@ -22,14 +22,23 @@ export class InventoryScannerApp {
   private accumulated: RawBarcode[] = [];
   private accumulateTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly accumulateWindowMs = 400;
+  private isRunning = false;
 
   constructor() {
     this.ui = new UIManager();
-    this.ui.setStartHandler(() => this.start());
-    this.ui.setStopHandler(() => this.stop());
+    this.ui.setToggleHandler(() => this.toggleCamera());
+  }
+
+  private async toggleCamera(): Promise<void> {
+    if (this.isRunning) {
+      this.stop();
+    } else {
+      await this.start();
+    }
   }
 
   async start(): Promise<void> {
+    this.ui.setCameraActive(true);
     this.ui.setStatus('Starting camera…');
 
     this.scanner = new BarcodeScannerEngine(
@@ -42,11 +51,14 @@ export class InventoryScannerApp {
     );
 
     await this.scanner.start(this.ui.getVideoElement());
+    this.isRunning = true;
   }
 
   stop(): void {
     this.scanner?.stop();
     this.scanner = null;
+    this.isRunning = false;
+    this.ui.setCameraActive(false);
     this.ui.setStatus('Camera stopped');
   }
 

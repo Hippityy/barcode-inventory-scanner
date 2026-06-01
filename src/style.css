@@ -121,6 +121,15 @@ button {
   background: #d8dbe1;
 }
 
+.btn-danger {
+  background: #dc3545;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
 .btn-copy {
   background: #f0f1f5;
   color: #333;
